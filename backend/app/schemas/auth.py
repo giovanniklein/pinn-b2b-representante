@@ -49,6 +49,8 @@ class AuthRegisterRequest(BaseModel):
     email: EmailStr
     telefone: Optional[str] = None
     senha: str
+    estado_atendimento: Optional[str] = Field(default=None, min_length=2, max_length=2)
+    cidades_atendidas: list[str] = Field(default_factory=list)
 
     enderecos_extras: list[EnderecoInput] = Field(
         default_factory=list,

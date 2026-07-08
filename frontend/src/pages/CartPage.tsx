@@ -79,8 +79,21 @@ interface Endereco {
   eh_principal: boolean;
 }
 
-interface EnderecoListResponse {
-  items: Endereco[];
+interface Cliente {
+  id: string;
+  nome: string;
+  cnpj?: string | null;
+  cidade?: string | null;
+  uf?: string | null;
+  enderecos: Endereco[];
+}
+
+interface ClienteListResponse {
+  items: Cliente[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
 }
 
 interface FinalizarCarrinhoResponse {
@@ -123,6 +136,8 @@ const formatCurrency = (value: number | null | undefined) => {
   );
 };
 
+const SELECTED_CLIENTE_KEY = 'pinn_representante_cliente_id';
+
 const formatUnidade = (value: string) => (value ? value.toUpperCase() : value);
 
 const formatQtdUnidades = (value: number | null | undefined) => {
@@ -148,6 +163,8 @@ const formatPrecoPorUnidade = (
 export function CartPage() {
   const [carrinho, setCarrinho] = useState<CarrinhoResponse | null>(null);
   const [enderecos, setEnderecos] = useState<Endereco[]>([]);
+  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [clienteId, setClienteId] = useState(() => localStorage.getItem(SELECTED_CLIENTE_KEY) ?? '');
   const [condicoesPagamentoSelecionadas, setCondicoesPagamentoSelecionadas] = useState<
     Record<string, string>
   >({});
@@ -187,15 +204,24 @@ export function CartPage() {
     }
   };
 
-  const loadEnderecos = async () => {
+  const loadClientes = async () => {
     try {
-      const { data } = await api.get<EnderecoListResponse>('/enderecos/');
-      setEnderecos(data.items);
+      const { data } = await api.get<ClienteListResponse>('/clientes', {
+        params: { page: 1, page_size: 100 },
+      });
+      let nextClientes = data.items ?? [];
+      if (clienteId && !nextClientes.some((cliente) => cliente.id === clienteId)) {
+        const selected = await api.get<Cliente>(`/clientes/${clienteId}`);
+        nextClientes = [selected.data, ...nextClientes];
+      }
+      setClientes(nextClientes);
+      const selected = nextClientes.find((cliente) => cliente.id === clienteId);
+      setEnderecos(selected?.enderecos ?? []);
     } catch (err: any) {
       const message =
-        err?.response?.data?.detail ?? 'Nao foi possivel carregar os enderecos.';
+        err?.response?.data?.detail ?? 'Nao foi possivel carregar os clientes.';
       toast({
-        title: 'Erro ao carregar enderecos',
+        title: 'Erro ao carregar clientes',
         description: message,
         status: 'error',
         duration: 4000,
@@ -206,8 +232,20 @@ export function CartPage() {
 
   useEffect(() => {
     loadCarrinho();
-    loadEnderecos();
+    loadClientes();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (clienteId) {
+      localStorage.setItem(SELECTED_CLIENTE_KEY, clienteId);
+    } else {
+      localStorage.removeItem(SELECTED_CLIENTE_KEY);
+    }
+    const selected = clientes.find((cliente) => cliente.id === clienteId);
+    setEnderecos(selected?.enderecos ?? []);
+    setEnderecosSelecionados({});
+  }, [clienteId, clientes]);
 
   const itensAgrupadosPorAtacadista = useMemo(() => {
     const grupos: Record<string, CarrinhoItem[]> = {};
@@ -381,6 +419,7 @@ export function CartPage() {
           page: 1,
           page_size: 20,
           q: termo && termo.trim() ? termo.trim() : undefined,
+          cliente_id: clienteId || undefined,
         },
       });
 
@@ -488,10 +527,20 @@ export function CartPage() {
 
     if (!enderecos.length) {
       toast({
-        title: 'Cadastre um endereco',
-        description: 'Cadastre ao menos um endereco de entrega para finalizar o pedido.',
+        title: 'Selecione um cliente',
+        description: 'Escolha um cliente com endereco de entrega antes de finalizar o pedido.',
         status: 'warning',
         duration: 4000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    if (!clienteId) {
+      toast({
+        title: 'Selecione um cliente',
+        status: 'warning',
+        duration: 3000,
         isClosable: true,
       });
       return;
@@ -507,6 +556,7 @@ export function CartPage() {
     }));
 
     const payload = {
+      cliente_id: clienteId,
       enderecos: enderecosPayload,
     };
 
@@ -572,11 +622,28 @@ export function CartPage() {
         Meu carrinho
       </Text>
       <Text color="gray.500" mb={6}>
-        Revise os itens e selecione um endereco de entrega para cada atacadista antes de
+        Revise os itens, selecione o cliente e escolha um endereco de entrega para cada atacadista antes de
         finalizar.
       </Text>
 
       <Stack spacing={6}>
+        <Box borderWidth="1px" borderRadius="md" p={4} bg="white">
+          <Text fontWeight="semibold" mb={2}>Cliente da venda</Text>
+          <Select value={clienteId} onChange={(e) => setClienteId(e.target.value)}>
+            <option value="">Selecione o cliente</option>
+            {clientes.map((cliente) => (
+              <option key={cliente.id} value={cliente.id}>
+                {cliente.nome.toUpperCase()} {cliente.cidade ? `- ${cliente.cidade}/${cliente.uf ?? ''}` : ''}
+              </option>
+            ))}
+          </Select>
+          {!clienteId && (
+            <Text fontSize="sm" color="orange.600" mt={2}>
+              A finalizacao exige cliente selecionado para validar cidade/UF e gravar o pedido.
+            </Text>
+          )}
+        </Box>
+
         {Object.entries(itensAgrupadosPorAtacadista).map(([atacadistaId, itens]) => (
           <Box key={atacadistaId} borderWidth="1px" borderRadius="md" p={4} bg="white">
             <Flex

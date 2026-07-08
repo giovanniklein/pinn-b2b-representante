@@ -96,6 +96,7 @@ class FinalizarCarrinhoRequest(BaseModel):
     endereÃ§o de entrega deve ser utilizado.
     """
 
+    cliente_id: str = Field(..., description="ID do cliente/varejista atendido pelo representante")
     enderecos: List[FinalizarCarrinhoEnderecoItem]
 
 

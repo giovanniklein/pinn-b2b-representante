@@ -39,6 +39,9 @@ interface PedidoListItem {
   id: string;
   atacadista_id: string;
   atacadista_nome?: string | null;
+  cliente_id?: string | null;
+  cliente_nome?: string | null;
+  cliente_cnpj?: string | null;
   condicao_pagamento?: string;
   observacao_representante?: string | null;
   senha_compra?: string | null;
@@ -240,6 +243,9 @@ export function OrdersPage() {
                   <Text fontSize="xs" color="gray.500">
                     Condicao: {pedido.condicao_pagamento ?? 'A VISTA'}
                   </Text>
+                  <Text fontSize="xs" color="gray.500">
+                    Cliente: {pedido.cliente_nome || pedido.cliente_cnpj || '-'}
+                  </Text>
                   {pedido.senha_compra ? (
                     <Text fontSize="xs" color="purple.600" fontWeight="semibold" mt={1}>
                       Senha: {pedido.senha_compra}
@@ -275,6 +281,7 @@ export function OrdersPage() {
               <Thead>
                 <Tr>
                   <Th>Atacadista</Th>
+                  <Th>Cliente</Th>
                   <Th>Endereco de entrega</Th>
                   <Th isNumeric>Valor total</Th>
                   <Th>Status</Th>
@@ -311,6 +318,7 @@ export function OrdersPage() {
                         </Text>
                       ) : null}
                     </Td>
+                    <Td>{pedido.cliente_nome || pedido.cliente_cnpj || '-'}</Td>
                     <Td>
                       <Text fontSize="sm" noOfLines={2}>
                         {pedido.endereco_entrega.descricao} - {pedido.endereco_entrega.cidade}/

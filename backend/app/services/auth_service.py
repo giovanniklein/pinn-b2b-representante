@@ -111,6 +111,8 @@ class AuthService:
             "telefone": payload.telefone or cnpj_data.get("telefone"),
             "razao_social": cnpj_data.get("razao_social"),
             "nome_fantasia": cnpj_data.get("nome_fantasia"),
+            "estado_atendimento": (payload.estado_atendimento or "").strip().upper() or None,
+            "cidades_atendidas": [cidade.strip().upper() for cidade in payload.cidades_atendidas if cidade.strip()],
             "enderecos": [principal_endereco, *enderecos_extras],
             "created_at": now,
             "updated_at": now,

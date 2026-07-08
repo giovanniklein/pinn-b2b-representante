@@ -12,9 +12,11 @@ from app.core.config import get_settings
 from app.repositories.base import (
     AtacadistaLeituraRepository,
     CarrinhoRepository,
+    documento_atende_cliente,
     ProdutoLeituraRepository,
     RepresentantePedidoRepository,
     RepresentanteRepository,
+    VarejistaLeituraRepository,
 )
 from app.schemas.carrinho import (
     CarrinhoItemRequest,
@@ -72,6 +74,7 @@ class CarrinhoService:
         self.atacadista_repo = AtacadistaLeituraRepository(db)
         self.pedido_repo = RepresentantePedidoRepository(db)
         self.representante_repo = RepresentanteRepository(db)
+        self.varejista_repo = VarejistaLeituraRepository(db)
 
     async def obter_carrinho(self, representante_id: str) -> CarrinhoResponse:
         doc = await self.carrinho_repo.get_carrinho_by_representante(representante_id)
@@ -335,7 +338,21 @@ class CarrinhoService:
                 detail="Representante nao encontrado",
             )
 
-        enderecos_por_id: Dict[str, Dict] = {e["id"]: e for e in representante.get("enderecos", [])}
+        cliente = await self.varejista_repo.get_by_id(payload.cliente_id)
+        if not cliente:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Cliente nao encontrado",
+            )
+        if not self.representante_repo.atende_cliente(representante, cliente):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cliente fora da area de atendimento do representante",
+            )
+
+        cliente_enderecos = self._normalizar_enderecos_cliente(cliente)
+        enderecos_por_id: Dict[str, Dict] = {e["id"]: e for e in cliente_enderecos}
+        cliente_nome = cliente.get("nome_fantasia") or cliente.get("razao_social") or cliente.get("nome") or cliente.get("email")
 
         itens_por_atacadista: Dict[str, List[Dict]] = defaultdict(list)
         for item in carrinho_doc["itens"]:
@@ -349,6 +366,16 @@ class CarrinhoService:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=f"Atacadista {atacadista_id} inativo ou nao encontrado",
+                )
+            if not atacadista.get("participa_venda_mais"):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Atacadista {atacadista_id} nao participa do Venda Mais",
+                )
+            if not documento_atende_cliente(atacadista, cliente):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Atacadista {atacadista_id} nao atende o cliente selecionado",
                 )
 
             condicoes_ofertadas = self._normalize_condicoes_pagamento(atacadista)
@@ -433,6 +460,15 @@ class CarrinhoService:
                     or representante.get("razao_social")
                     or representante.get("nome")
                 ),
+                "cliente_id": payload.cliente_id,
+                "cliente_nome": cliente_nome,
+                "cliente_cnpj": cliente.get("cnpj"),
+                "cliente_snapshot": {
+                    "id": payload.cliente_id,
+                    "nome": cliente_nome,
+                    "cnpj": cliente.get("cnpj"),
+                    "email": cliente.get("email"),
+                },
                 "condicao_pagamento": condicao_pagamento,
                 "observacao_representante": observacao_representante,
                 "senha_compra": senha_compra,
@@ -595,6 +631,42 @@ class CarrinhoService:
 
         await self.carrinho_repo.upsert_carrinho(representante_id, carrinho_doc)
         return await self.obter_carrinho(representante_id)
+
+    def _normalizar_enderecos_cliente(self, cliente: Dict) -> List[Dict]:
+        enderecos_raw = cliente.get("enderecos") or []
+        if not enderecos_raw:
+            enderecos_raw = [
+                {
+                    "id": "principal",
+                    "descricao": "Endereco principal",
+                    "logradouro": cliente.get("endereco") or cliente.get("logradouro") or "",
+                    "numero": cliente.get("numero") or "",
+                    "bairro": cliente.get("bairro") or "",
+                    "cidade": cliente.get("cidade") or "",
+                    "uf": cliente.get("uf") or cliente.get("estado") or "",
+                    "cep": cliente.get("cep") or "",
+                    "complemento": cliente.get("complemento"),
+                    "eh_principal": True,
+                }
+            ]
+
+        enderecos: List[Dict] = []
+        for index, endereco in enumerate(enderecos_raw):
+            enderecos.append(
+                {
+                    "id": str(endereco.get("id") or f"endereco-{index + 1}"),
+                    "descricao": str(endereco.get("descricao") or "Endereco"),
+                    "logradouro": str(endereco.get("logradouro") or endereco.get("endereco") or ""),
+                    "numero": str(endereco.get("numero") or ""),
+                    "bairro": str(endereco.get("bairro") or ""),
+                    "cidade": str(endereco.get("cidade") or ""),
+                    "uf": str(endereco.get("uf") or endereco.get("estado") or "").upper(),
+                    "cep": str(endereco.get("cep") or ""),
+                    "complemento": endereco.get("complemento"),
+                    "eh_principal": bool(endereco.get("eh_principal") or index == 0),
+                }
+            )
+        return enderecos
 
     async def _calcular_comissao_venda_mais(self, valor_total: float) -> dict:
         config = await self.db["configuracoes"].find_one({"tipo": "app"}) or {}

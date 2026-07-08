@@ -50,6 +50,8 @@ interface RegisterFormValues {
   uf?: string;
   cep?: string;
   complemento?: string;
+  estado_atendimento?: string;
+  cidades_atendidas?: string;
 
   enderecos_extras: EnderecoExtraForm[];
 }
@@ -165,6 +167,8 @@ export function RegisterPage() {
         email: values.email,
         telefone: values.telefone,
         senha: values.senha,
+        estado_atendimento: values.estado_atendimento || undefined,
+        cidades_atendidas: String(values.cidades_atendidas || '').split(',').map((item) => item.trim()).filter(Boolean),
         enderecos_extras: values.enderecos_extras,
       };
 
@@ -288,6 +292,17 @@ export function RegisterPage() {
                 <FormLabel>Complemento</FormLabel>
                 <Textarea rows={2} {...register('complemento')} />
               </FormControl>
+
+              <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+                <FormControl>
+                  <FormLabel>UF de atendimento</FormLabel>
+                  <Input maxLength={2} {...register('estado_atendimento')} />
+                </FormControl>
+                <FormControl>
+                  <FormLabel>Cidades atendidas separadas por vírgula</FormLabel>
+                  <Input placeholder="Ex.: Curitiba, São José dos Pinhais" {...register('cidades_atendidas')} />
+                </FormControl>
+              </SimpleGrid>
 
               <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
                 <FormControl isInvalid={!!errors.email}>

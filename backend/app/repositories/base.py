@@ -2,12 +2,75 @@ from __future__ import annotations
 
 import re
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from bson import ObjectId
 from bson.errors import InvalidId
 from motor.motor_asyncio import AsyncIOMotorCollection, AsyncIOMotorDatabase
 from pymongo.errors import DuplicateKeyError
+
+from app.utils.text import normalize_search_text
+
+
+def _normalize_uf(value: Any) -> str:
+    return str(value or "").strip().upper()
+
+
+def _doc_cidades_norm(doc: Dict[str, Any]) -> set[str]:
+    return {normalize_search_text(c) for c in (doc.get("cidades_atendidas") or []) if c}
+
+
+def _doc_estado_atendimento(doc: Dict[str, Any]) -> str:
+    return _normalize_uf(doc.get("estado_atendimento") or doc.get("uf") or doc.get("estado"))
+
+
+def _doc_atende_local(doc: Dict[str, Any], cidade_norm: str, uf: str) -> bool:
+    cidades = _doc_cidades_norm(doc)
+    if cidades:
+        return bool(cidade_norm and cidade_norm in cidades)
+
+    estado = _doc_estado_atendimento(doc)
+    if estado:
+        return bool(uf and uf == estado)
+
+    return True
+
+
+def _enderecos_cliente(doc: Dict[str, Any]) -> List[Dict[str, Any]]:
+    enderecos = doc.get("enderecos") or []
+    if enderecos:
+        return enderecos
+    return [
+        {
+            "id": "principal",
+            "descricao": "Endereco principal",
+            "logradouro": doc.get("endereco") or doc.get("logradouro") or "",
+            "numero": doc.get("numero") or "",
+            "bairro": doc.get("bairro") or "",
+            "cidade": doc.get("cidade") or "",
+            "uf": doc.get("uf") or doc.get("estado") or "",
+            "cep": doc.get("cep") or "",
+            "complemento": doc.get("complemento"),
+            "eh_principal": True,
+        }
+    ]
+
+
+def _locais_cliente(doc: Dict[str, Any]) -> List[Tuple[str, str]]:
+    locais: List[Tuple[str, str]] = []
+    for endereco in _enderecos_cliente(doc):
+        cidade_norm = normalize_search_text(endereco.get("cidade") or "")
+        uf = _normalize_uf(endereco.get("uf") or endereco.get("estado"))
+        if cidade_norm or uf:
+            locais.append((cidade_norm, uf))
+    return locais
+
+
+def documento_atende_cliente(doc: Dict[str, Any], cliente_doc: Dict[str, Any]) -> bool:
+    locais = _locais_cliente(cliente_doc)
+    if not locais:
+        return True
+    return any(_doc_atende_local(doc, cidade_norm, uf) for cidade_norm, uf in locais)
 
 
 class RepresentanteMultiTenantRepository:
@@ -162,6 +225,9 @@ class RepresentanteRepository:
             {"_id": ObjectId(representante_id)},
             {"$set": {"enderecos": enderecos}},
         )
+
+    def atende_cliente(self, representante: Dict[str, Any], cliente: Dict[str, Any]) -> bool:
+        return documento_atende_cliente(representante, cliente)
 
 
 class RepresentanteUsuarioRepository:
@@ -391,6 +457,15 @@ class AtacadistaLeituraRepository:
         cursor = self._collection.find(self._venda_mais_filter())
         return [doc async for doc in cursor]
 
+    async def get_participantes_venda_mais_para_cliente(
+        self,
+        cliente_doc: Dict[str, Any] | None,
+    ) -> List[Dict[str, Any]]:
+        docs = await self.get_participantes_venda_mais()
+        if not cliente_doc:
+            return docs
+        return [doc for doc in docs if documento_atende_cliente(doc, cliente_doc)]
+
     async def get_visiveis_para_cidades(self, cidades_norm: set[str]) -> List[Dict[str, Any]]:
         """Retorna atacadistas ativos visíveis para um cliente de dadas cidades.
 
@@ -416,3 +491,47 @@ class AtacadistaLeituraRepository:
             if cidades_norm & norm_atendidas:
                 visiveis.append(doc)
         return visiveis
+
+
+class VarejistaLeituraRepository:
+    """Repositório somente-leitura de clientes/varejistas para Venda Mais."""
+
+    def __init__(self, db: AsyncIOMotorDatabase) -> None:
+        self._db = db
+        self._collection: AsyncIOMotorCollection = db["varejistas"]
+
+    def _active_filter(self) -> Dict[str, Any]:
+        return {"$or": [{"ativo": {"$exists": False}}, {"ativo": True}]}
+
+    async def get_by_id(self, varejista_id: str) -> Optional[Dict[str, Any]]:
+        try:
+            object_id = ObjectId(varejista_id)
+        except (InvalidId, TypeError):
+            return None
+        return await self._collection.find_one({"_id": object_id, **self._active_filter()})
+
+    async def listar_visiveis_para_representante(
+        self,
+        representante_doc: Dict[str, Any],
+        *,
+        q: str | None = None,
+    ) -> List[Dict[str, Any]]:
+        filters: Dict[str, Any] = self._active_filter()
+        if q:
+            term = re.escape(q.strip())
+            filters = {
+                "$and": [
+                    filters,
+                    {
+                        "$or": [
+                            {"nome_fantasia": {"$regex": term, "$options": "i"}},
+                            {"razao_social": {"$regex": term, "$options": "i"}},
+                            {"cnpj": {"$regex": term, "$options": "i"}},
+                            {"email": {"$regex": term, "$options": "i"}},
+                        ]
+                    },
+                ]
+            }
+
+        docs = [doc async for doc in self._collection.find(filters).sort("nome_fantasia", 1)]
+        return [doc for doc in docs if documento_atende_cliente(representante_doc, doc)]

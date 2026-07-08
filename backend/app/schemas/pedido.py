@@ -42,6 +42,9 @@ class PedidoListItem(BaseModel):
         description="Nome/razao social do atacadista para exibicao na lista de pedidos",
     )
     condicao_pagamento: str = Field(default="A VISTA")
+    cliente_id: str | None = Field(default=None)
+    cliente_nome: str | None = Field(default=None)
+    cliente_cnpj: str | None = Field(default=None)
     observacao_representante: str | None = Field(default=None)
     senha_compra: str | None = Field(default=None, description="Palavra-chave da compra, se gerada")
     valor_total: float
@@ -71,6 +74,9 @@ class PedidoDetailResponse(BaseModel):
     )
     condicao_pagamento: str = Field(default="A VISTA")
     observacao_representante: str | None = Field(default=None)
+    cliente_id: str | None = Field(default=None)
+    cliente_nome: str | None = Field(default=None)
+    cliente_cnpj: str | None = Field(default=None)
     senha_compra: str | None = Field(default=None, description="Palavra-chave da compra, se gerada")
     representante_id: str
     valor_total: float

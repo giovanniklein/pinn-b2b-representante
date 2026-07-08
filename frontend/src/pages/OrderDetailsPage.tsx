@@ -52,6 +52,9 @@ interface PedidoDetailResponse {
   id: string;
   atacadista_id: string;
   atacadista_nome?: string | null;
+  cliente_id?: string | null;
+  cliente_nome?: string | null;
+  cliente_cnpj?: string | null;
   condicao_pagamento: string;
   observacao_representante?: string | null;
   senha_compra?: string | null;
@@ -193,6 +196,10 @@ export function OrderDetailsPage() {
     doc.setFontSize(11);
     doc.text(`Atacadista: ${pedido.atacadista_nome ?? pedido.atacadista_id}`, 14, currentY);
     currentY += 6;
+    if (pedido.cliente_nome || pedido.cliente_cnpj) {
+      doc.text(`Cliente: ${pedido.cliente_nome || pedido.cliente_cnpj}`, 14, currentY);
+      currentY += 6;
+    }
     doc.text(`Status: ${pedido.status}`, 14, currentY);
     currentY += 6;
     doc.text(`Condicao de pagamento: ${pedido.condicao_pagamento ?? 'A VISTA'}`, 14, currentY);
@@ -397,6 +404,10 @@ export function OrderDetailsPage() {
                   <Badge colorScheme="purple">
                     {pedido.atacadista_nome ?? pedido.atacadista_id}
                   </Badge>
+                </HStack>
+                <HStack justify="space-between">
+                  <Text color="gray.600">Cliente</Text>
+                  <Text>{pedido.cliente_nome || pedido.cliente_cnpj || '-'}</Text>
                 </HStack>
                 <HStack justify="space-between">
                   <Text color="gray.600">Status</Text>

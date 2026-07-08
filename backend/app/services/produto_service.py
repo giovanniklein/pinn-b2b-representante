@@ -5,11 +5,14 @@ from math import ceil
 from typing import Dict, Optional
 
 from bson import ObjectId
+from fastapi import HTTPException, status
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.repositories.base import (
     AtacadistaLeituraRepository,
     ProdutoLeituraRepository,
+    RepresentanteRepository,
+    VarejistaLeituraRepository,
 )
 from app.schemas.produto import ProdutoListResponse, ProdutoPreco, ProdutoResponse
 from app.utils.text import normalize_search_text
@@ -26,17 +29,44 @@ class ProdutoLeituraService:
     def __init__(self, db: AsyncIOMotorDatabase) -> None:
         self.repo = ProdutoLeituraRepository(db)
         self.atacadista_repo = AtacadistaLeituraRepository(db)
+        self.representante_repo = RepresentanteRepository(db)
+        self.varejista_repo = VarejistaLeituraRepository(db)
 
-    async def _atacadistas_visiveis(self, representante_id: str | None) -> list[str]:
-        """IDs dos parceiros participantes do Venda Mais."""
+    async def _cliente_visivel(self, representante_id: str | None, cliente_id: str | None) -> dict | None:
+        if not cliente_id:
+            return None
 
-        docs = await self.atacadista_repo.get_participantes_venda_mais()
+        cliente = await self.varejista_repo.get_by_id(cliente_id)
+        if not cliente:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cliente nao encontrado")
+
+        if representante_id:
+            representante = await self.representante_repo.get_active_by_id(representante_id)
+            if not representante or not self.representante_repo.atende_cliente(representante, cliente):
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cliente fora da area de atendimento")
+
+        return cliente
+
+    async def _atacadistas_visiveis(
+        self,
+        representante_id: str | None,
+        cliente_id: str | None = None,
+    ) -> list[str]:
+        """IDs dos parceiros participantes do Venda Mais e compatíveis com o cliente."""
+
+        cliente = await self._cliente_visivel(representante_id, cliente_id)
+        docs = await self.atacadista_repo.get_participantes_venda_mais_para_cliente(cliente)
         return [str(d["_id"]) for d in docs]
 
-    async def listar_parceiros_visiveis(self, representante_id: str | None) -> list[dict]:
+    async def listar_parceiros_visiveis(
+        self,
+        representante_id: str | None,
+        cliente_id: str | None = None,
+    ) -> list[dict]:
         """Lista os parceiros disponíveis para o cliente escolher (seletor)."""
 
-        docs = await self.atacadista_repo.get_participantes_venda_mais()
+        cliente = await self._cliente_visivel(representante_id, cliente_id)
+        docs = await self.atacadista_repo.get_participantes_venda_mais_para_cliente(cliente)
         parceiros = []
         for d in docs:
             nome = d.get("nome_fantasia") or d.get("razao_social") or d.get("nome") or ""
@@ -52,6 +82,7 @@ class ProdutoLeituraService:
         query: str | None = None,
         atacadista_id: str | None = None,
         representante_id: str | None = None,
+        cliente_id: str | None = None,
     ) -> ProdutoListResponse:
         if page < 1:
             page = 1
@@ -60,7 +91,7 @@ class ProdutoLeituraService:
 
         skip = (page - 1) * page_size
 
-        active_atacadista_ids = await self._atacadistas_visiveis(representante_id)
+        active_atacadista_ids = await self._atacadistas_visiveis(representante_id, cliente_id)
         if not active_atacadista_ids:
             return ProdutoListResponse(
                 items=[],
@@ -159,6 +190,7 @@ class ProdutoLeituraService:
         produto_id: str,
         *,
         representante_id: str | None = None,
+        cliente_id: str | None = None,
     ) -> Optional[ProdutoResponse]:
         doc = await self.repo.find_by_id(produto_id)
         if not doc:
@@ -174,7 +206,7 @@ class ProdutoLeituraService:
             # Respeita a cobertura por cidade: se o parceiro não atende a
             # cidade do cliente, o produto não é acessível.
             if representante_id is not None:
-                visiveis = await self._atacadistas_visiveis(representante_id)
+                visiveis = await self._atacadistas_visiveis(representante_id, cliente_id)
                 if atacadista_id not in visiveis:
                     return None
             atacadista_por_id[atacadista_id] = atacadista

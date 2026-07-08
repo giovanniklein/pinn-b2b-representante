@@ -19,7 +19,11 @@ RepresentanteDep = Annotated[str, Depends(get_current_representante_id)]
 
 
 @router.get('/parceiros')
-async def listar_parceiros(db: DbDep, representante_id: RepresentanteDep) -> list[dict]:
+async def listar_parceiros(
+    db: DbDep,
+    representante_id: RepresentanteDep,
+    cliente_id: str | None = Query(default=None, description='Filtra parceiros pelo cliente selecionado'),
+) -> list[dict]:
     """Lista os parceiros (atacadistas) que atendem a cidade do cliente.
 
     Usado no seletor da vitrine para o cliente montar um pedido de um único
@@ -27,7 +31,7 @@ async def listar_parceiros(db: DbDep, representante_id: RepresentanteDep) -> lis
     """
 
     service = ProdutoLeituraService(db)
-    return await service.listar_parceiros_visiveis(representante_id)
+    return await service.listar_parceiros_visiveis(representante_id, cliente_id=cliente_id)
 
 
 @router.get('/', response_model=ProdutoListResponse)
@@ -38,6 +42,7 @@ async def listar_produtos(
     page_size: int = Query(default=20, ge=1, le=100, description='Quantidade de itens por pagina'),
     q: str | None = Query(default=None, description='Busca parcial por descricao do produto'),
     atacadista_id: str | None = Query(default=None, description='Filtra produtos de um atacadista especifico'),
+    cliente_id: str | None = Query(default=None, description='Filtra produtos pela cidade/UF do cliente selecionado'),
 ) -> ProdutoListResponse:
     """Lista produtos para o representante (apenas de parceiros que atendem a cidade dele)."""
 
@@ -48,6 +53,7 @@ async def listar_produtos(
         query=q,
         atacadista_id=atacadista_id,
         representante_id=representante_id,
+        cliente_id=cliente_id,
     )
 
 
@@ -56,11 +62,12 @@ async def obter_produto(
     produto_id: str,
     db: DbDep,
     representante_id: RepresentanteDep,
+    cliente_id: str | None = Query(default=None, description='Valida o produto contra o cliente selecionado'),
 ) -> ProdutoResponse:
     """Obtem os detalhes de um unico produto."""
 
     service = ProdutoLeituraService(db)
-    produto = await service.obter_produto(produto_id, representante_id=representante_id)
+    produto = await service.obter_produto(produto_id, representante_id=representante_id, cliente_id=cliente_id)
     if not produto:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

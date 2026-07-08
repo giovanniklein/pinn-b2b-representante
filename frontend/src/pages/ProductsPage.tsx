@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 
 import {
   Box,
+  Button,
   Flex,
   Image,
   Input,
@@ -39,6 +40,24 @@ interface ProdutoListResponse {
   total_pages: number;
 }
 
+interface Cliente {
+  id: string;
+  nome: string;
+  cnpj?: string | null;
+  cidade?: string | null;
+  uf?: string | null;
+}
+
+interface ClienteListResponse {
+  items: Cliente[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
+const SELECTED_CLIENTE_KEY = 'pinn_representante_cliente_id';
+
 export function ProductsPage() {
   const [items, setItems] = useState<Produto[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -53,6 +72,11 @@ export function ProductsPage() {
   const [vitrineTitulo, setVitrineTitulo] = useState('Aqui frete é grátis');
   const [parceiros, setParceiros] = useState<{ id: string; nome: string }[]>([]);
   const [parceiroId, setParceiroId] = useState('');
+  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [clienteId, setClienteId] = useState(() => localStorage.getItem(SELECTED_CLIENTE_KEY) ?? '');
+  const [clienteSearch, setClienteSearch] = useState('');
+  const [clientePage, setClientePage] = useState(1);
+  const [clienteTotalPages, setClienteTotalPages] = useState(1);
 
   const toast = useToast();
   const navigate = useNavigate();
@@ -62,7 +86,14 @@ export function ProductsPage() {
     term: string,
     append: boolean,
     atacadista: string,
+    cliente: string,
   ) => {
+    if (!cliente) {
+      setItems([]);
+      setTotalPages(1);
+      setPage(1);
+      return;
+    }
     if (append) {
       setIsLoadingMore(true);
     } else {
@@ -77,6 +108,7 @@ export function ProductsPage() {
           page_size: 20,
           q: term.trim() ? term.trim() : undefined,
           atacadista_id: atacadista || undefined,
+          cliente_id: cliente,
         },
       });
 
@@ -103,12 +135,50 @@ export function ProductsPage() {
     }
   };
 
+  const fetchClientes = async (pageToFetch: number, term: string, append = false) => {
+    try {
+      const { data } = await api.get<ClienteListResponse>('/clientes', {
+        params: {
+          page: pageToFetch,
+          page_size: 20,
+          q: term.trim() ? term.trim() : undefined,
+        },
+      });
+      let nextItems = append ? [...clientes, ...(data.items ?? [])] : data.items ?? [];
+      if (clienteId && !nextItems.some((cliente) => cliente.id === clienteId)) {
+        try {
+          const selected = await api.get<Cliente>(`/clientes/${clienteId}`);
+          nextItems = [selected.data, ...nextItems];
+        } catch {
+          localStorage.removeItem(SELECTED_CLIENTE_KEY);
+          setClienteId('');
+        }
+      }
+      setClientes(nextItems);
+      setClientePage(data.page ?? pageToFetch);
+      setClienteTotalPages(data.total_pages ?? 1);
+    } catch {
+      setClientes([]);
+      setClientePage(1);
+      setClienteTotalPages(1);
+    }
+  };
+
   useEffect(() => {
     setPage(1);
     setTotalPages(1);
-    fetchProdutos(1, searchTerm, false, parceiroId);
+    fetchProdutos(1, searchTerm, false, parceiroId, clienteId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm, parceiroId]);
+  }, [searchTerm, parceiroId, clienteId]);
+
+  useEffect(() => {
+    if (clienteId) {
+      localStorage.setItem(SELECTED_CLIENTE_KEY, clienteId);
+    } else {
+      localStorage.removeItem(SELECTED_CLIENTE_KEY);
+    }
+    setParceiroId('');
+  }, [clienteId]);
 
   useEffect(() => {
     // Título da vitrine é configurável pelo ADM.
@@ -120,16 +190,24 @@ export function ProductsPage() {
       .catch(() => {
         // mantém o título padrão em caso de falha
       });
-    // Parceiros que atendem a cidade do cliente (para o seletor de fornecedor).
-    api
-      .get<{ id: string; nome: string }[]>('/produtos/parceiros')
-      .then(({ data }) => setParceiros(Array.isArray(data) ? data : []))
-      .catch(() => setParceiros([]));
+    void fetchClientes(1, '');
   }, []);
 
   useEffect(() => {
+    if (!clienteId) {
+      setParceiros([]);
+      return;
+    }
+    // Parceiros que atendem a cidade do cliente (para o seletor de fornecedor).
+    api
+      .get<{ id: string; nome: string }[]>('/produtos/parceiros', { params: { cliente_id: clienteId } })
+      .then(({ data }) => setParceiros(Array.isArray(data) ? data : []))
+      .catch(() => setParceiros([]));
+  }, [clienteId]);
+
+  useEffect(() => {
     if (page <= 1) return;
-    fetchProdutos(page, searchTerm, true, parceiroId);
+    fetchProdutos(page, searchTerm, true, parceiroId, clienteId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page]);
 
@@ -137,6 +215,12 @@ export function ProductsPage() {
     event.preventDefault();
     setPage(1);
     setSearchTerm(search);
+  };
+
+  const handleClienteSearchSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setClienteId('');
+    void fetchClientes(1, clienteSearch, false);
   };
 
   const hasMore = useMemo(() => page < totalPages, [page, totalPages]);
@@ -236,12 +320,49 @@ export function ProductsPage() {
             </InputGroup>
           </Box>
 
+          <Box as="form" onSubmit={handleClienteSearchSubmit}>
+            <InputGroup size="md">
+              <InputLeftElement pointerEvents="none">
+                <SearchIcon color="gray.400" />
+              </InputLeftElement>
+              <Input
+                placeholder="Buscar cliente por nome, CNPJ ou email"
+                value={clienteSearch}
+                onChange={(e) => setClienteSearch(e.target.value)}
+                bg="white"
+              />
+            </InputGroup>
+          </Box>
+
+          <Flex gap={2} direction={{ base: 'column', sm: 'row' }}>
+            <Select
+              size="md"
+              bg="white"
+              value={clienteId}
+              onChange={(e) => setClienteId(e.target.value)}
+              aria-label="Escolher cliente"
+            >
+              <option value="">Selecione o cliente da venda</option>
+              {clientes.map((cliente) => (
+                <option key={cliente.id} value={cliente.id}>
+                  {cliente.nome.toUpperCase()} {cliente.cidade ? `- ${cliente.cidade}/${cliente.uf ?? ''}` : ''}
+                </option>
+              ))}
+            </Select>
+            {clientePage < clienteTotalPages && (
+              <Button variant="outline" onClick={() => fetchClientes(clientePage + 1, clienteSearch, true)}>
+                Mais clientes
+              </Button>
+            )}
+          </Flex>
+
           <Select
             size="md"
             bg="white"
             value={parceiroId}
             onChange={(e) => setParceiroId(e.target.value)}
             aria-label="Escolher fornecedor"
+            isDisabled={!clienteId}
           >
             <option value="">Todos os fornecedores</option>
             {parceiros.map((p) => (
@@ -253,6 +374,11 @@ export function ProductsPage() {
           {parceiroId && (
             <Text fontSize="xs" color="gray.500">
               Mostrando apenas produtos deste fornecedor. Seu pedido sairá só com ele.
+            </Text>
+          )}
+          {!clienteId && (
+            <Text fontSize="sm" color="orange.600">
+              Selecione um cliente para ver produtos compatíveis com a cidade/UF de entrega.
             </Text>
           )}
         </Stack>
@@ -271,7 +397,7 @@ export function ProductsPage() {
         </Text>
       )}
 
-      {items.length === 0 && !isLoading && <Text>Nenhum produto encontrado.</Text>}
+      {items.length === 0 && !isLoading && clienteId && <Text>Nenhum produto encontrado.</Text>}
 
       {items.length > 0 && (
         <>
