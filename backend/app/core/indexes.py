@@ -20,6 +20,7 @@ async def ensure_indexes(db: AsyncIOMotorDatabase) -> None:
         [("representante_id", 1)],
         unique=True,
         name="uniq_carrinhos_representante_id",
+        partialFilterExpression={"representante_id": {"$exists": True}},
     )
     await db["atacadistas"].create_index(
         [("ativo", 1)],
