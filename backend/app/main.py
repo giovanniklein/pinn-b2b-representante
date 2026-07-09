@@ -6,7 +6,17 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1 import auth, carrinho, clientes, configuracoes, enderecos, pedidos, produtos
+from app.api.v1 import (
+    auth,
+    carrinho,
+    clientes,
+    configuracoes,
+    enderecos,
+    gestao_clientes,
+    gestao_parceiros,
+    pedidos,
+    produtos,
+)
 from app.core.config import get_settings
 from app.core.database import close_client, get_client
 from app.core.indexes import ensure_indexes
@@ -64,6 +74,8 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(enderecos.router, prefix="/enderecos", tags=["enderecos"])
 app.include_router(clientes.router, prefix="/clientes", tags=["clientes"])
+app.include_router(gestao_clientes.router, prefix="/gestao/clientes", tags=["gestao-clientes"])
+app.include_router(gestao_parceiros.router, prefix="/gestao/parceiros", tags=["gestao-parceiros"])
 app.include_router(produtos.router, prefix="/produtos", tags=["produtos"])
 app.include_router(carrinho.router, prefix="/carrinho", tags=["carrinho"])
 app.include_router(pedidos.router, prefix="/pedidos", tags=["pedidos"])

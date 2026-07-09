@@ -492,6 +492,61 @@ class AtacadistaLeituraRepository:
                 visiveis.append(doc)
         return visiveis
 
+    # --- Escrita/manutenção pelo representante (cadastro de parceiros) ---
+
+    async def find_by_cnpj(self, cnpj: str) -> Optional[Dict[str, Any]]:
+        return await self._collection.find_one({"cnpj": cnpj})
+
+    async def find_by_email_ci(self, email: str) -> Optional[Dict[str, Any]]:
+        return await self._collection.find_one(
+            {"email": {"$regex": f"^{re.escape(email)}$", "$options": "i"}}
+        )
+
+    async def insert(self, data: Dict[str, Any]) -> str:
+        result = await self._collection.insert_one(data)
+        return str(result.inserted_id)
+
+    async def get_raw_by_id(self, atacadista_id: str) -> Optional[Dict[str, Any]]:
+        """Busca sem filtro de ativo/pausa (para manutenção do representante)."""
+
+        try:
+            object_id = ObjectId(atacadista_id)
+        except (InvalidId, TypeError):
+            return None
+        return await self._collection.find_one({"_id": object_id})
+
+    async def update_fields(self, atacadista_id: str, data: Dict[str, Any]) -> bool:
+        try:
+            object_id = ObjectId(atacadista_id)
+        except (InvalidId, TypeError):
+            return False
+        result = await self._collection.update_one({"_id": object_id}, {"$set": data})
+        return result.matched_count > 0
+
+    async def listar_criados_por_representante(
+        self,
+        representante_id: str,
+        *,
+        q: str | None = None,
+    ) -> List[Dict[str, Any]]:
+        filters: Dict[str, Any] = {"criado_por_representante_id": representante_id}
+        if q:
+            term = re.escape(q.strip())
+            filters = {
+                "$and": [
+                    filters,
+                    {
+                        "$or": [
+                            {"nome_fantasia": {"$regex": term, "$options": "i"}},
+                            {"razao_social": {"$regex": term, "$options": "i"}},
+                            {"cnpj": {"$regex": term, "$options": "i"}},
+                            {"email": {"$regex": term, "$options": "i"}},
+                        ]
+                    },
+                ]
+            }
+        return [doc async for doc in self._collection.find(filters).sort("nome_fantasia", 1)]
+
 
 class VarejistaLeituraRepository:
     """Repositório somente-leitura de clientes/varejistas para Venda Mais."""
@@ -535,3 +590,81 @@ class VarejistaLeituraRepository:
 
         docs = [doc async for doc in self._collection.find(filters).sort("nome_fantasia", 1)]
         return [doc for doc in docs if documento_atende_cliente(representante_doc, doc)]
+
+    async def listar_todos(self, *, q: str | None = None) -> List[Dict[str, Any]]:
+        """Lista TODOS os clientes ativos (seletor de venda do representante).
+
+        Regra de negócio: o representante pode vender para qualquer cliente da
+        plataforma, então aqui não há filtro por área de atendimento.
+        """
+
+        filters: Dict[str, Any] = self._active_filter()
+        if q:
+            term = re.escape(q.strip())
+            filters = {
+                "$and": [
+                    filters,
+                    {
+                        "$or": [
+                            {"nome_fantasia": {"$regex": term, "$options": "i"}},
+                            {"razao_social": {"$regex": term, "$options": "i"}},
+                            {"cnpj": {"$regex": term, "$options": "i"}},
+                            {"email": {"$regex": term, "$options": "i"}},
+                        ]
+                    },
+                ]
+            }
+        return [doc async for doc in self._collection.find(filters).sort("nome_fantasia", 1)]
+
+    # --- Escrita/manutenção pelo representante (cadastro de clientes) ---
+
+    async def find_by_cnpj(self, cnpj: str) -> Optional[Dict[str, Any]]:
+        return await self._collection.find_one({"cnpj": cnpj})
+
+    async def find_by_email_ci(self, email: str) -> Optional[Dict[str, Any]]:
+        return await self._collection.find_one(
+            {"email": {"$regex": f"^{re.escape(email)}$", "$options": "i"}}
+        )
+
+    async def insert(self, data: Dict[str, Any]) -> str:
+        result = await self._collection.insert_one(data)
+        return str(result.inserted_id)
+
+    async def get_raw_by_id(self, varejista_id: str) -> Optional[Dict[str, Any]]:
+        try:
+            object_id = ObjectId(varejista_id)
+        except (InvalidId, TypeError):
+            return None
+        return await self._collection.find_one({"_id": object_id})
+
+    async def update_fields(self, varejista_id: str, data: Dict[str, Any]) -> bool:
+        try:
+            object_id = ObjectId(varejista_id)
+        except (InvalidId, TypeError):
+            return False
+        result = await self._collection.update_one({"_id": object_id}, {"$set": data})
+        return result.matched_count > 0
+
+    async def listar_criados_por_representante(
+        self,
+        representante_id: str,
+        *,
+        q: str | None = None,
+    ) -> List[Dict[str, Any]]:
+        filters: Dict[str, Any] = {"criado_por_representante_id": representante_id}
+        if q:
+            term = re.escape(q.strip())
+            filters = {
+                "$and": [
+                    filters,
+                    {
+                        "$or": [
+                            {"nome_fantasia": {"$regex": term, "$options": "i"}},
+                            {"razao_social": {"$regex": term, "$options": "i"}},
+                            {"cnpj": {"$regex": term, "$options": "i"}},
+                            {"email": {"$regex": term, "$options": "i"}},
+                        ]
+                    },
+                ]
+            }
+        return [doc async for doc in self._collection.find(filters).sort("nome_fantasia", 1)]

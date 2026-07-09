@@ -183,6 +183,12 @@ export function MainLayout() {
               <NavLink to="/carrinho">Carrinho</NavLink>
             </WrapItem>
             <WrapItem>
+              <NavLink to="/meus-clientes">Clientes</NavLink>
+            </WrapItem>
+            <WrapItem>
+              <NavLink to="/meus-parceiros">Parceiros</NavLink>
+            </WrapItem>
+            <WrapItem>
               <NavLink to="/pedidos">Pedidos</NavLink>
             </WrapItem>
             <WrapItem>

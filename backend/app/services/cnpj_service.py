@@ -75,3 +75,16 @@ class CNPJService:
             "telefone": estabelecimento.get("telefone1") or estabelecimento.get("telefone2"),
             "email": estabelecimento.get("email"),
         }
+
+    async def buscar_dados_opcional(self, cnpj: str) -> Dict[str, Any] | None:
+        """Versão best-effort usada no cadastro de clientes pelo representante.
+
+        Retorna ``None`` (em vez de lançar erro) quando o CNPJ é inválido, não
+        é encontrado ou a API está indisponível, de modo que o cadastro possa
+        prosseguir com os dados informados manualmente.
+        """
+
+        try:
+            return await self.buscar_dados(cnpj)
+        except HTTPException:
+            return None

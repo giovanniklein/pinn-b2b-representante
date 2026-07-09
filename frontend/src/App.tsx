@@ -10,6 +10,8 @@ import { OrdersPage } from './pages/OrdersPage';
 import { OrderDetailsPage } from './pages/OrderDetailsPage';
 import { ProductsPage } from './pages/ProductsPage';
 import { ProductDetailsPage } from './pages/ProductDetailsPage';
+import { ClientsPage } from './pages/ClientsPage';
+import { PartnersPage } from './pages/PartnersPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { DashboardPage } from './pages/DashboardPage';
 import { ProtectedRoute } from './routes/ProtectedRoute';
@@ -26,6 +28,8 @@ export default function App() {
         <Route element={<MainLayout />}>
           <Route path="/produtos" element={<ProductsPage />} />
           <Route path="/produtos/:id" element={<ProductDetailsPage />} />
+          <Route path="/meus-clientes" element={<ClientsPage />} />
+          <Route path="/meus-parceiros" element={<PartnersPage />} />
           <Route path="/enderecos" element={<AddressesPage />} />
           <Route path="/perfil" element={<ProfilePage />} />
           <Route path="/carrinho" element={<CartPage />} />

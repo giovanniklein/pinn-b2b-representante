@@ -40,10 +40,14 @@ class ProdutoLeituraService:
         if not cliente:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cliente nao encontrado")
 
+        # O representante pode atender qualquer cliente da plataforma; apenas
+        # garantimos que o representante esteja ativo. A cobertura por cidade
+        # continua sendo aplicada do lado do PARCEIRO (só aparecem parceiros
+        # VendeMais que atendem a cidade do cliente).
         if representante_id:
             representante = await self.representante_repo.get_active_by_id(representante_id)
-            if not representante or not self.representante_repo.atende_cliente(representante, cliente):
-                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cliente fora da area de atendimento")
+            if not representante:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Representante inativo")
 
         return cliente
 
