@@ -469,6 +469,9 @@ class CarrinhoService:
                     or representante.get("nome")
                 ),
                 "cliente_id": payload.cliente_id,
+                # Também grava varejista_id (= cliente) para o pedido ficar
+                # IDÊNTICO ao pedido normal na visão do parceiro (nome, link, busca).
+                "varejista_id": payload.cliente_id,
                 "cliente_nome": cliente_nome,
                 "cliente_cnpj": cliente.get("cnpj"),
                 "cliente_snapshot": {
