@@ -491,11 +491,12 @@ class CarrinhoService:
                 ],
                 "valor_total": valor_total,
                 "comissao_total_percentual": comissao["percentual_total"],
-                "comissao_representante_percentual": comissao["percentual_representante"],
-                "comissao_kipi_percentual": comissao["percentual_kipi"],
                 "comissao_total_valor": comissao["valor_total_comissao"],
-                "comissao_representante_valor": comissao["valor_representante"],
-                "comissao_kipi_valor": comissao["valor_kipi"],
+                # Sem split representante/KIPI (comissão única no Plano VendeMais).
+                "comissao_representante_percentual": None,
+                "comissao_kipi_percentual": None,
+                "comissao_representante_valor": None,
+                "comissao_kipi_valor": None,
                 "comissao_status": "prevista",
                 "status": "pendente",
                 "data_criacao": datetime.utcnow(),
@@ -669,24 +670,13 @@ class CarrinhoService:
         return enderecos
 
     async def _calcular_comissao_venda_mais(self, valor_total: float) -> dict:
+        # Plano VendeMais: comissão ÚNICA sobre a venda (sem split representante/KIPI).
         config = await self.db["configuracoes"].find_one({"tipo": "app"}) or {}
-        percentual_total = float(
-            config.get("venda_mais_comissao_total_percentual", settings.venda_mais_comissao_total_percentual)
-        )
-        percentual_representante = float(
-            config.get("venda_mais_percentual_representante", settings.venda_mais_percentual_representante)
-        )
-        percentual_kipi = float(config.get("venda_mais_percentual_kipi", settings.venda_mais_percentual_kipi))
-        valor_total_comissao = round(valor_total * percentual_total, 2)
-        valor_representante = round(valor_total_comissao * percentual_representante, 2)
-        valor_kipi = round(valor_total_comissao * percentual_kipi, 2)
+        percentual = float(config.get("comissao_venda_mais", settings.comissao_venda_mais))
+        valor_comissao = round(valor_total * percentual, 2)
         return {
-            "percentual_total": percentual_total,
-            "percentual_representante": percentual_representante,
-            "percentual_kipi": percentual_kipi,
-            "valor_total_comissao": valor_total_comissao,
-            "valor_representante": valor_representante,
-            "valor_kipi": valor_kipi,
+            "percentual_total": percentual,
+            "valor_total_comissao": valor_comissao,
         }
 
     def _obter_preco_por_unidade(self, produto: Dict, unidade: str) -> float:

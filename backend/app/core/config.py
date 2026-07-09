@@ -53,16 +53,10 @@ class Settings(BaseSettings):
         default=60 * 24 * 7, alias="REFRESH_TOKEN_EXPIRE_MINUTES"  # 7 days
     )
 
-    # Venda Mais - defaults usados quando o ADM ainda nao configurou regra especifica.
-    venda_mais_comissao_total_percentual: float = Field(
-        default=0.05, alias="VENDA_MAIS_COMISSAO_TOTAL_PERCENTUAL"
-    )
-    venda_mais_percentual_representante: float = Field(
-        default=0.70, alias="VENDA_MAIS_PERCENTUAL_REPRESENTANTE"
-    )
-    venda_mais_percentual_kipi: float = Field(
-        default=0.30, alias="VENDA_MAIS_PERCENTUAL_KIPI"
-    )
+    # Plano VendeMais - comissão única sobre as vendas (sem split).
+    # Default usado quando o ADM ainda não configurou. Admin edita em /configuracoes.
+    comissao_venda_mais: float = Field(default=0.04499, alias="COMISSAO_VENDA_MAIS")
+    comissao_padrao: float = Field(default=0.0196, alias="COMISSAO_PADRAO")
 
     # CORS
     cors_allowed_origins: List[str] = Field(
