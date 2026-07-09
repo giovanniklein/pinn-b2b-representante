@@ -53,9 +53,11 @@ class Settings(BaseSettings):
         default=60 * 24 * 7, alias="REFRESH_TOKEN_EXPIRE_MINUTES"  # 7 days
     )
 
-    # Plano VendeMais - comissão única sobre as vendas (sem split).
-    # Default usado quando o ADM ainda não configurou. Admin edita em /configuracoes.
-    comissao_venda_mais: float = Field(default=0.04499, alias="COMISSAO_VENDA_MAIS")
+    # Plano VendeMais - comissão da venda feita pelo representante, separada em
+    # parte do representante + parte do portal (total = soma). Defaults usados
+    # quando o ADM ainda não configurou (admin edita em /configuracoes do adm).
+    comissao_vm_representante: float = Field(default=0.03, alias="COMISSAO_VM_REPRESENTANTE")
+    comissao_vm_portal: float = Field(default=0.015, alias="COMISSAO_VM_PORTAL")
     comissao_padrao: float = Field(default=0.0196, alias="COMISSAO_PADRAO")
 
     # CORS

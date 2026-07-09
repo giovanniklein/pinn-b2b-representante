@@ -31,8 +31,11 @@ async def listar_clientes(
     if not representante:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Representante inativo")
 
-    # O representante pode vender para QUALQUER cliente da plataforma.
-    docs = await VarejistaLeituraRepository(db).listar_todos(q=q)
+    # Vende para QUALQUER cliente ativo da plataforma + seus próprios
+    # pré-cadastros (para poder vender e, na entrega, ativar o cliente).
+    docs = await VarejistaLeituraRepository(db).listar_venda_para_representante(
+        representante_id, q=q
+    )
     total = len(docs)
     skip = (page - 1) * page_size
     items = [cliente_to_response(doc) for doc in docs[skip : skip + page_size]]
@@ -57,8 +60,18 @@ async def obter_cliente(
     if not representante:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Representante inativo")
 
-    # Venda liberada para qualquer cliente da plataforma (sem filtro de área).
-    cliente = await VarejistaLeituraRepository(db).get_by_id(cliente_id)
+    # Venda liberada para qualquer cliente ativo; além disso, o rep pode acessar
+    # seus próprios pré-cadastros (ainda não ativos).
+    repo = VarejistaLeituraRepository(db)
+    cliente = await repo.get_by_id(cliente_id)
+    if not cliente:
+        raw = await repo.get_raw_by_id(cliente_id)
+        if (
+            raw
+            and raw.get("status_cadastro") == "pre_cadastro"
+            and raw.get("criado_por_representante_id") == representante_id
+        ):
+            cliente = raw
     if not cliente:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cliente nao encontrado")
     return cliente_to_response(cliente)

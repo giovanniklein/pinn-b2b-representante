@@ -33,6 +33,7 @@ interface Cliente {
   email?: string | null;
   cidade?: string | null;
   uf?: string | null;
+  status_cadastro?: string;
 }
 
 interface ClienteListResponse {
@@ -190,9 +191,21 @@ export function ClientsPage() {
       <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={4}>
         {clientes.map((c) => (
           <Box key={c.id} borderWidth="1px" borderRadius="md" p={4} bg="white" shadow="sm">
-            <Text fontWeight="semibold" noOfLines={1}>{c.nome}</Text>
+            <Flex justify="space-between" align="start" gap={2}>
+              <Text fontWeight="semibold" noOfLines={1}>{c.nome}</Text>
+              {c.status_cadastro === 'pre_cadastro' ? (
+                <Badge colorScheme="orange">Pré-cadastro</Badge>
+              ) : (
+                <Badge colorScheme="green">Ativo</Badge>
+              )}
+            </Flex>
             {c.cnpj && <Text fontSize="sm" color="gray.600">CNPJ: {c.cnpj}</Text>}
             {c.email && <Text fontSize="sm" color="gray.600" noOfLines={1}>{c.email}</Text>}
+            {c.status_cadastro === 'pre_cadastro' && (
+              <Text fontSize="xs" color="orange.600" mt={1}>
+                Ativa após a 1ª venda VendeMais ser entregue.
+              </Text>
+            )}
             {(c.cidade || c.uf) && (
               <Badge mt={2} colorScheme="blue">{[c.cidade, c.uf].filter(Boolean).join('/')}</Badge>
             )}

@@ -189,6 +189,9 @@ export function MainLayout() {
               <NavLink to="/meus-parceiros">Parceiros</NavLink>
             </WrapItem>
             <WrapItem>
+              <NavLink to="/comissoes">Comissões</NavLink>
+            </WrapItem>
+            <WrapItem>
               <NavLink to="/pedidos">Pedidos</NavLink>
             </WrapItem>
             <WrapItem>

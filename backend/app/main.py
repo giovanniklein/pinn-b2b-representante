@@ -16,6 +16,7 @@ from app.api.v1 import (
     gestao_parceiros,
     pedidos,
     produtos,
+    relatorios,
 )
 from app.core.config import get_settings
 from app.core.database import close_client, get_client
@@ -76,6 +77,7 @@ app.include_router(enderecos.router, prefix="/enderecos", tags=["enderecos"])
 app.include_router(clientes.router, prefix="/clientes", tags=["clientes"])
 app.include_router(gestao_clientes.router, prefix="/gestao/clientes", tags=["gestao-clientes"])
 app.include_router(gestao_parceiros.router, prefix="/gestao/parceiros", tags=["gestao-parceiros"])
+app.include_router(relatorios.router, prefix="/relatorios", tags=["relatorios"])
 app.include_router(produtos.router, prefix="/produtos", tags=["produtos"])
 app.include_router(carrinho.router, prefix="/carrinho", tags=["carrinho"])
 app.include_router(pedidos.router, prefix="/pedidos", tags=["pedidos"])

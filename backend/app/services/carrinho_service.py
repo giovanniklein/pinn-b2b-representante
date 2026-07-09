@@ -340,6 +340,15 @@ class CarrinhoService:
 
         cliente = await self.varejista_repo.get_by_id(payload.cliente_id)
         if not cliente:
+            # Permite vender para o PRÓPRIO pré-cadastro (a entrega vai ativá-lo).
+            raw = await self.varejista_repo.get_raw_by_id(payload.cliente_id)
+            if (
+                raw
+                and raw.get("status_cadastro") == "pre_cadastro"
+                and raw.get("criado_por_representante_id") == representante_id
+            ):
+                cliente = raw
+        if not cliente:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Cliente nao encontrado",
@@ -491,11 +500,11 @@ class CarrinhoService:
                 "valor_total": valor_total,
                 "comissao_total_percentual": comissao["percentual_total"],
                 "comissao_total_valor": comissao["valor_total_comissao"],
-                # Sem split representante/KIPI (comissão única no Plano VendeMais).
-                "comissao_representante_percentual": None,
-                "comissao_kipi_percentual": None,
-                "comissao_representante_valor": None,
-                "comissao_kipi_valor": None,
+                # Split representante x portal (KIPI) da comissão VendeMais.
+                "comissao_representante_percentual": comissao["percentual_representante"],
+                "comissao_representante_valor": comissao["valor_representante"],
+                "comissao_portal_percentual": comissao["percentual_portal"],
+                "comissao_portal_valor": comissao["valor_portal"],
                 "comissao_status": "prevista",
                 "status": "pendente",
                 "data_criacao": datetime.utcnow(),
@@ -669,13 +678,18 @@ class CarrinhoService:
         return enderecos
 
     async def _calcular_comissao_venda_mais(self, valor_total: float) -> dict:
-        # Plano VendeMais: comissão ÚNICA sobre a venda (sem split representante/KIPI).
+        # Venda pelo VendeMais: comissão dividida entre representante e portal.
         config = await self.db["configuracoes"].find_one({"tipo": "app"}) or {}
-        percentual = float(config.get("comissao_venda_mais", settings.comissao_venda_mais))
-        valor_comissao = round(valor_total * percentual, 2)
+        rep_pct = float(config.get("comissao_vm_representante", settings.comissao_vm_representante))
+        portal_pct = float(config.get("comissao_vm_portal", settings.comissao_vm_portal))
+        total_pct = rep_pct + portal_pct
         return {
-            "percentual_total": percentual,
-            "valor_total_comissao": valor_comissao,
+            "percentual_total": total_pct,
+            "valor_total_comissao": round(valor_total * total_pct, 2),
+            "percentual_representante": rep_pct,
+            "valor_representante": round(valor_total * rep_pct, 2),
+            "percentual_portal": portal_pct,
+            "valor_portal": round(valor_total * portal_pct, 2),
         }
 
     def _obter_preco_por_unidade(self, produto: Dict, unidade: str) -> float:

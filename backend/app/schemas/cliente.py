@@ -25,6 +25,7 @@ class ClienteListItem(BaseModel):
     email: str | None = None
     cidade: str | None = None
     uf: str | None = None
+    status_cadastro: str = Field(default="ativo")
     enderecos: list[ClienteEnderecoResponse] = Field(default_factory=list)
 
 
@@ -78,5 +79,6 @@ def cliente_to_response(doc: dict[str, Any]) -> ClienteListItem:
         email=doc.get("email"),
         cidade=principal.cidade if principal else None,
         uf=principal.uf if principal else None,
+        status_cadastro=doc.get("status_cadastro") or ("ativo" if doc.get("ativo", True) is not False else "pre_cadastro"),
         enderecos=enderecos,
     )

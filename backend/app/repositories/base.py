@@ -616,14 +616,71 @@ class VarejistaLeituraRepository:
             }
         return [doc async for doc in self._collection.find(filters).sort("nome_fantasia", 1)]
 
+    async def listar_venda_para_representante(
+        self,
+        representante_id: str,
+        *,
+        q: str | None = None,
+    ) -> List[Dict[str, Any]]:
+        """Clientes disponíveis para o representante VENDER pelo VendeMais.
+
+        Inclui todos os clientes ATIVOS da plataforma + os PRÉ-CADASTROS criados
+        pelo próprio representante (para que ele possa vender e, na entrega,
+        ativar o cliente).
+        """
+
+        base = await self.listar_todos(q=q)
+        pre = await self.listar_pre_cadastros_do_representante(representante_id, q=q)
+        vistos = {str(d.get("_id")) for d in base}
+        return base + [d for d in pre if str(d.get("_id")) not in vistos]
+
+    async def listar_pre_cadastros_do_representante(
+        self,
+        representante_id: str,
+        *,
+        q: str | None = None,
+    ) -> List[Dict[str, Any]]:
+        filters: Dict[str, Any] = {
+            "criado_por_representante_id": representante_id,
+            "status_cadastro": "pre_cadastro",
+        }
+        if q:
+            term = re.escape(q.strip())
+            filters = {
+                "$and": [
+                    filters,
+                    {
+                        "$or": [
+                            {"nome_fantasia": {"$regex": term, "$options": "i"}},
+                            {"razao_social": {"$regex": term, "$options": "i"}},
+                            {"cnpj": {"$regex": term, "$options": "i"}},
+                            {"email": {"$regex": term, "$options": "i"}},
+                        ]
+                    },
+                ]
+            }
+        return [doc async for doc in self._collection.find(filters).sort("nome_fantasia", 1)]
+
     # --- Escrita/manutenção pelo representante (cadastro de clientes) ---
 
     async def find_by_cnpj(self, cnpj: str) -> Optional[Dict[str, Any]]:
         return await self._collection.find_one({"cnpj": cnpj})
 
+    async def find_ativo_by_cnpj(self, cnpj: str) -> Optional[Dict[str, Any]]:
+        """Cliente ATIVO com este CNPJ (bloqueia recadastro de cliente já ativo)."""
+        return await self._collection.find_one({"cnpj": cnpj, **self._active_filter()})
+
     async def find_by_email_ci(self, email: str) -> Optional[Dict[str, Any]]:
         return await self._collection.find_one(
             {"email": {"$regex": f"^{re.escape(email)}$", "$options": "i"}}
+        )
+
+    async def find_ativo_by_email_ci(self, email: str) -> Optional[Dict[str, Any]]:
+        return await self._collection.find_one(
+            {
+                "email": {"$regex": f"^{re.escape(email)}$", "$options": "i"},
+                **self._active_filter(),
+            }
         )
 
     async def insert(self, data: Dict[str, Any]) -> str:

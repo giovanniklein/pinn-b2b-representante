@@ -12,7 +12,6 @@ from app.core.database import get_database
 from app.core.security import get_password_hash
 from app.repositories.base import (
     RepresentanteRepository,
-    RepresentanteUsuarioRepository,
     VarejistaLeituraRepository,
 )
 from app.schemas.cliente import ClienteListItem, ClienteListResponse, cliente_to_response
@@ -48,17 +47,16 @@ async def criar_cliente(
     representante = await _get_representante_ativo(db, representante_id)
 
     varejista_repo = VarejistaLeituraRepository(db)
-    usuario_repo = RepresentanteUsuarioRepository(db)
 
     email = str(payload.email).strip().lower()
 
-    # Deduplicação: CNPJ e e-mail (cliente já existe na plataforma)
-    if await varejista_repo.find_by_cnpj(payload.cnpj):
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Já existe um cliente com este CNPJ")
-    if await varejista_repo.find_by_email_ci(email):
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Já existe um cliente com este e-mail")
-    if await usuario_repo.find_by_email_any_tipo_ci(email):
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Já existe um usuário com este e-mail")
+    # Deduplicação: só bloqueia se JÁ EXISTE um cliente ATIVO com este CNPJ/e-mail.
+    # Vários representantes podem ter PRÉ-CADASTRO do mesmo CNPJ (todos aceitos);
+    # o vínculo ativo será de quem primeiro vender e entregar pelo VendeMais.
+    if await varejista_repo.find_ativo_by_cnpj(payload.cnpj):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Já existe um cliente ativo com este CNPJ")
+    if await varejista_repo.find_ativo_by_email_ci(email):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Já existe um cliente ativo com este e-mail")
 
     # Enriquecimento best-effort via CNPJ (não bloqueia o cadastro se falhar)
     cnpj_data = await CNPJService().buscar_dados_opcional(payload.cnpj) or {}
@@ -95,6 +93,8 @@ async def criar_cliente(
     ]
 
     now = datetime.utcnow()
+    # PRÉ-CADASTRO: cliente ainda não pode comprar sozinho (sem login). Só é
+    # ativado quando a 1ª venda VendeMais deste representante for ENTREGUE.
     varejista_doc = {
         "cnpj": payload.cnpj.strip(),
         "email": email,
@@ -102,29 +102,16 @@ async def criar_cliente(
         "razao_social": razao_social,
         "nome_fantasia": nome_fantasia,
         "enderecos": [principal, *extras],
-        "ativo": True,
-        # Vínculo com o representante que cadastrou: gera comissão em toda compra
-        # deste cliente (venda pelo rep OU compra do próprio cliente no portal).
+        "ativo": False,
+        "status_cadastro": "pre_cadastro",
+        # Senha definida pelo rep, usada para criar o login quando ativar.
+        "senha_hash_pendente": get_password_hash(payload.senha),
         "criado_por_representante_id": representante_id,
         "criado_por_representante_nome": _nome_representante(representante),
         "created_at": now,
         "updated_at": now,
     }
     varejista_id = await varejista_repo.insert(varejista_doc)
-
-    # Usuário de acesso do cliente (login em cliente.kipi.com.br)
-    await usuario_repo.insert(
-        {
-            "tipo_usuario": "varejista",
-            "varejista_id": varejista_id,
-            "nome": nome_fantasia or razao_social,
-            "email": email,
-            "telefone": payload.telefone or cnpj_data.get("telefone"),
-            "senha_hash": get_password_hash(payload.senha),
-            "is_admin": True,
-            "created_at": now,
-        }
-    )
 
     varejista_doc["_id"] = varejista_id
     return cliente_to_response(varejista_doc)
