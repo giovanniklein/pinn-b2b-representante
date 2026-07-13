@@ -7,7 +7,34 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.core.database import get_database
 from app.models.common import PedidoStatus
-from app.repositories.base import AtacadistaLeituraRepository, ProdutoLeituraRepository
+from app.repositories.base import (
+    AtacadistaLeituraRepository,
+    ProdutoLeituraRepository,
+    VarejistaLeituraRepository,
+)
+
+
+def _formatar_endereco_cadastral(doc: dict) -> str | None:
+    """Endereço cadastral do cliente (o que ele preencheu) em uma linha."""
+
+    if not doc:
+        return None
+    enderecos = doc.get("enderecos") or []
+    princ = next((e for e in enderecos if e.get("eh_principal")), None)
+    if not princ:
+        princ = enderecos[0] if enderecos else {}
+    partes: list[str] = []
+    linha1 = ", ".join(str(x) for x in [princ.get("logradouro"), princ.get("numero")] if x)
+    if linha1:
+        partes.append(linha1)
+    if princ.get("bairro"):
+        partes.append(str(princ["bairro"]))
+    cidade_uf = "/".join(str(x) for x in [princ.get("cidade"), princ.get("uf")] if x)
+    if cidade_uf:
+        partes.append(cidade_uf)
+    if princ.get("cep"):
+        partes.append(f"CEP {princ['cep']}")
+    return " - ".join(partes) or None
 from app.schemas.pedido import (
     PedidoDetailResponse,
     PedidoEnderecoResponse,
@@ -149,6 +176,12 @@ async def obter_pedido(
             atacadista_email = atacadista_doc.get("email")
             atacadista_telefone = atacadista_doc.get("telefone")
 
+    # Dados cadastrais do cliente (razão social / endereço) para o documento
+    cliente_doc = {}
+    cliente_id = doc.get("cliente_id")
+    if cliente_id:
+        cliente_doc = await VarejistaLeituraRepository(db).get_raw_by_id(str(cliente_id)) or {}
+
     # Código de catálogo dos produtos (para a tabela de itens do documento)
     produto_ids = [str(item.get("produto_id")) for item in doc.get("itens", [])]
     produtos = await ProdutoLeituraRepository(db).find_by_ids(
@@ -184,7 +217,10 @@ async def obter_pedido(
         observacao_representante=doc.get("observacao_representante"),
         cliente_id=doc.get("cliente_id"),
         cliente_nome=doc.get("cliente_nome"),
-        cliente_cnpj=doc.get("cliente_cnpj"),
+        cliente_razao_social=cliente_doc.get("razao_social"),
+        cliente_inscricao_estadual=cliente_doc.get("inscricao_estadual") or cliente_doc.get("ie"),
+        cliente_cnpj=doc.get("cliente_cnpj") or cliente_doc.get("cnpj"),
+        cliente_endereco=_formatar_endereco_cadastral(cliente_doc),
         senha_compra=doc.get("senha_compra"),
         representante_id=str(doc.get("representante_id")),
         valor_total=float(doc.get("valor_total", 0.0)),

@@ -20,9 +20,13 @@ export interface PedidoDocumentoItem {
 
 export interface PedidoDocumentoParte {
   nome?: string | null;
+  razaoSocial?: string | null;
+  inscricaoEstadual?: string | null;
   cnpj?: string | null;
   email?: string | null;
   telefone?: string | null;
+  /** Endereço cadastral (o que o cliente preencheu no cadastro), já formatado. */
+  endereco?: string | null;
 }
 
 export interface PedidoDocumentoEntrega {
@@ -170,8 +174,11 @@ export function gerarPedidoPdfBlob(dados: PedidoDocumento): Blob {
 
   const parteLinhas = (p: PedidoDocumentoParte): string[] => {
     const linhas: string[] = [];
-    linhas.push(p.nome || '--');
+    linhas.push(p.nome || p.razaoSocial || '--');
+    if (p.razaoSocial && p.razaoSocial !== p.nome) linhas.push(`Razão social: ${p.razaoSocial}`);
     if (p.cnpj) linhas.push(`CNPJ: ${p.cnpj}`);
+    if (p.inscricaoEstadual) linhas.push(`Inscrição estadual: ${p.inscricaoEstadual}`);
+    if (p.endereco) linhas.push(`Endereço: ${p.endereco}`);
     if (p.telefone) linhas.push(`Telefone: ${p.telefone}`);
     if (p.email) linhas.push(`E-mail: ${p.email}`);
     return linhas;

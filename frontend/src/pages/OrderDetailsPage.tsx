@@ -58,7 +58,10 @@ interface PedidoDetailResponse {
   representante_nome?: string | null;
   cliente_id?: string | null;
   cliente_nome?: string | null;
+  cliente_razao_social?: string | null;
+  cliente_inscricao_estadual?: string | null;
   cliente_cnpj?: string | null;
+  cliente_endereco?: string | null;
   condicao_pagamento: string;
   observacao_representante?: string | null;
   senha_compra?: string | null;
@@ -217,7 +220,10 @@ export function OrderDetailsPage() {
       },
       comprador: {
         nome: pedido.cliente_nome,
+        razaoSocial: pedido.cliente_razao_social,
+        inscricaoEstadual: pedido.cliente_inscricao_estadual,
         cnpj: pedido.cliente_cnpj,
+        endereco: pedido.cliente_endereco,
       },
       entrega: pedido.endereco_entrega,
       condicaoPagamento: pedido.condicao_pagamento,

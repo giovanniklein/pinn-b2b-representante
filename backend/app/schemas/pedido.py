@@ -81,7 +81,10 @@ class PedidoDetailResponse(BaseModel):
     observacao_representante: str | None = Field(default=None)
     cliente_id: str | None = Field(default=None)
     cliente_nome: str | None = Field(default=None)
+    cliente_razao_social: str | None = Field(default=None)
+    cliente_inscricao_estadual: str | None = Field(default=None)
     cliente_cnpj: str | None = Field(default=None)
+    cliente_endereco: str | None = Field(default=None, description="Endereço cadastral do cliente, formatado")
     senha_compra: str | None = Field(default=None, description="Palavra-chave da compra, se gerada")
     representante_id: str
     valor_total: float
