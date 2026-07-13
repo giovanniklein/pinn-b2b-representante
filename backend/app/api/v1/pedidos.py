@@ -7,7 +7,7 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.core.database import get_database
 from app.models.common import PedidoStatus
-from app.repositories.base import AtacadistaLeituraRepository
+from app.repositories.base import AtacadistaLeituraRepository, ProdutoLeituraRepository
 from app.schemas.pedido import (
     PedidoDetailResponse,
     PedidoEnderecoResponse,
@@ -133,10 +133,10 @@ async def obter_pedido(
     endereco_doc = doc.get("endereco_entrega") or {}
     endereco = PedidoEnderecoResponse(**endereco_doc)
 
-    # Carrega nome do atacadista para enriquecer a resposta de detalhe
+    # Carrega dados completos do atacadista para o documento do pedido
     atacadista_repo = AtacadistaLeituraRepository(db)
     atacadista_id = str(doc.get("atacadista_id")) if doc.get("atacadista_id") else ""
-    atacadista_nome = None
+    atacadista_nome = atacadista_cnpj = atacadista_email = atacadista_telefone = None
     if atacadista_id:
         atacadista_doc = await atacadista_repo.get_by_id(atacadista_id)
         if atacadista_doc:
@@ -145,12 +145,23 @@ async def obter_pedido(
                 or atacadista_doc.get("razao_social")
                 or atacadista_doc.get("nome")
             )
+            atacadista_cnpj = atacadista_doc.get("cnpj")
+            atacadista_email = atacadista_doc.get("email")
+            atacadista_telefone = atacadista_doc.get("telefone")
+
+    # Código de catálogo dos produtos (para a tabela de itens do documento)
+    produto_ids = [str(item.get("produto_id")) for item in doc.get("itens", [])]
+    produtos = await ProdutoLeituraRepository(db).find_by_ids(
+        produto_ids, projection={"codigo": 1}
+    )
+    codigo_por_produto = {str(p["_id"]): p.get("codigo") for p in produtos}
 
     itens: List[PedidoItemResponse] = []
     for item in doc.get("itens", []):
         itens.append(
             PedidoItemResponse(
                 produto_id=str(item.get("produto_id")),
+                codigo=codigo_por_produto.get(str(item.get("produto_id"))),
                 descricao_produto=item.get("descricao_produto", ""),
                 unidade=item.get("unidade"),
                 quantidade_unidades=int(item.get("quantidade_unidades", 1) or 1),
@@ -165,6 +176,10 @@ async def obter_pedido(
         origem_venda=doc.get("origem_venda"),
         atacadista_id=atacadista_id,
         atacadista_nome=atacadista_nome,
+        atacadista_cnpj=atacadista_cnpj,
+        atacadista_email=atacadista_email,
+        atacadista_telefone=atacadista_telefone,
+        representante_nome=doc.get("representante_nome"),
         condicao_pagamento=str(doc.get("condicao_pagamento", "A VISTA")),
         observacao_representante=doc.get("observacao_representante"),
         cliente_id=doc.get("cliente_id"),

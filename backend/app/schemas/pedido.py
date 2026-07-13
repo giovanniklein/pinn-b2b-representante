@@ -25,6 +25,7 @@ class PedidoEnderecoResponse(BaseModel):
 
 class PedidoItemResponse(BaseModel):
     produto_id: str
+    codigo: str | None = Field(default=None, description="Código do produto no catálogo do fornecedor")
     descricao_produto: str
     unidade: str
     quantidade_unidades: int = Field(default=1, ge=1)
@@ -72,6 +73,10 @@ class PedidoDetailResponse(BaseModel):
         default=None,
         description="Nome/razao social do atacadista para exibicao no detalhe do pedido",
     )
+    atacadista_cnpj: str | None = Field(default=None)
+    atacadista_email: str | None = Field(default=None)
+    atacadista_telefone: str | None = Field(default=None)
+    representante_nome: str | None = Field(default=None)
     condicao_pagamento: str = Field(default="A VISTA")
     observacao_representante: str | None = Field(default=None)
     cliente_id: str | None = Field(default=None)

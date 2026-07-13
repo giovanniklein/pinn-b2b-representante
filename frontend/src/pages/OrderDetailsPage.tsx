@@ -19,8 +19,7 @@ import {
 } from '@chakra-ui/react';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import { gerarPedidoPdfBlob } from '../utils/pedidoPdf';
 
 import { api } from '../api/client';
 
@@ -40,6 +39,7 @@ interface EnderecoEntrega {
 
 interface PedidoItem {
   produto_id: string;
+  codigo?: string | null;
   descricao_produto: string;
   unidade: string;
   quantidade_unidades?: number;
@@ -52,6 +52,10 @@ interface PedidoDetailResponse {
   id: string;
   atacadista_id: string;
   atacadista_nome?: string | null;
+  atacadista_cnpj?: string | null;
+  atacadista_email?: string | null;
+  atacadista_telefone?: string | null;
+  representante_nome?: string | null;
   cliente_id?: string | null;
   cliente_nome?: string | null;
   cliente_cnpj?: string | null;
@@ -188,75 +192,48 @@ export function OrderDetailsPage() {
   const buildPdfBlob = (): Blob | null => {
     if (!pedido) return null;
 
-    const doc = new jsPDF();
-    let currentY = 24;
+    const statusLabel =
+      pedido.status === 'pendente'
+        ? 'Pendente'
+        : pedido.status === 'aceito'
+          ? 'Aceito'
+          : pedido.status === 'recusado'
+            ? 'Recusado'
+            : pedido.status === 'cancelado'
+              ? 'Cancelado'
+              : 'Entregue';
 
-    doc.setFontSize(16);
-    doc.text(`Pedido ${formatPedidoCodigo(pedido.id)}`, 14, 16);
-    doc.setFontSize(11);
-    doc.text(`Atacadista: ${pedido.atacadista_nome ?? pedido.atacadista_id}`, 14, currentY);
-    currentY += 6;
-    if (pedido.cliente_nome || pedido.cliente_cnpj) {
-      doc.text(`Cliente: ${pedido.cliente_nome || pedido.cliente_cnpj}`, 14, currentY);
-      currentY += 6;
-    }
-    doc.text(`Status: ${pedido.status}`, 14, currentY);
-    currentY += 6;
-    doc.text(`Condicao de pagamento: ${pedido.condicao_pagamento ?? 'A VISTA'}`, 14, currentY);
-    currentY += 6;
-    if (pedido.senha_compra) {
-      doc.text(`Senha da compra: ${pedido.senha_compra}`, 14, currentY);
-      currentY += 6;
-    }
-    if (pedido.observacao_representante) {
-      const observacaoLines = doc.splitTextToSize(
-        `Observacao: ${pedido.observacao_representante}`,
-        180,
-      );
-      doc.text(observacaoLines, 14, currentY);
-      currentY += observacaoLines.length * 6;
-    }
-    doc.text(`Data: ${formatDate(pedido.data_criacao)}`, 14, currentY);
-    currentY += 6;
-    doc.text(`Valor total: ${formatCurrency(pedido.valor_total)}`, 14, currentY);
-    currentY += 10;
-
-    doc.text('Endereco de entrega:', 14, currentY);
-    currentY += 6;
-    doc.setFontSize(10);
-    doc.text(
-      `${pedido.endereco_entrega.descricao} - ${pedido.endereco_entrega.logradouro}, ${pedido.endereco_entrega.numero}`,
-      14,
-      currentY,
-    );
-    currentY += 6;
-    doc.text(
-      `${pedido.endereco_entrega.bairro} - ${pedido.endereco_entrega.cidade}/${pedido.endereco_entrega.uf} - CEP ${pedido.endereco_entrega.cep}`,
-      14,
-      currentY,
-    );
-    currentY += 6;
-    if (pedido.endereco_entrega.complemento) {
-      doc.text(`Complemento: ${pedido.endereco_entrega.complemento}`, 14, currentY);
-      currentY += 8;
-    }
-
-    autoTable(doc, {
-      startY: currentY + 2,
-      head: [['Produto', 'Unidade', 'Quantidade', 'Valor unitario', 'Subtotal']],
-      body: pedido.itens.map((item) => [
-        item.descricao_produto,
-        item.unidade,
-        String(item.quantidade),
-        formatCurrency(item.valor_unitario),
-        formatCurrency(item.valor_total),
-      ]),
-      styles: { fontSize: 9 },
-      headStyles: { fillColor: [33, 33, 33] },
+    return gerarPedidoPdfBlob({
+      numero: formatPedidoCodigo(pedido.id),
+      dataCriacao: pedido.data_criacao,
+      statusLabel,
+      vendaMais: true,
+      representanteNome: pedido.representante_nome,
+      fornecedor: {
+        nome: pedido.atacadista_nome ?? pedido.atacadista_id,
+        cnpj: pedido.atacadista_cnpj,
+        email: pedido.atacadista_email,
+        telefone: pedido.atacadista_telefone,
+      },
+      comprador: {
+        nome: pedido.cliente_nome,
+        cnpj: pedido.cliente_cnpj,
+      },
+      entrega: pedido.endereco_entrega,
+      condicaoPagamento: pedido.condicao_pagamento,
+      senhaCompra: pedido.senha_compra,
+      observacao: pedido.observacao_representante,
+      itens: pedido.itens.map((item) => ({
+        codigo: item.codigo,
+        descricao: item.descricao_produto,
+        unidade: item.unidade,
+        quantidadeUnidades: item.quantidade_unidades,
+        quantidade: item.quantidade,
+        valorUnitario: item.valor_unitario,
+        valorTotal: item.valor_total,
+      })),
+      valorTotal: pedido.valor_total,
     });
-
-    const pdfArrayBuffer = doc.output('arraybuffer');
-    return new Blob([pdfArrayBuffer], { type: 'application/pdf' });
   };
 
   const handleGerarPdf = async () => {
