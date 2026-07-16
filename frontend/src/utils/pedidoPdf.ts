@@ -24,7 +24,10 @@ export interface PedidoDocumentoParte {
   inscricaoEstadual?: string | null;
   cnpj?: string | null;
   email?: string | null;
+  emailNotas?: string | null;
+  nomeContato?: string | null;
   telefone?: string | null;
+  celular?: string | null;
   /** Endereço cadastral (o que o cliente preencheu no cadastro), já formatado. */
   endereco?: string | null;
 }
@@ -179,8 +182,11 @@ export function gerarPedidoPdfBlob(dados: PedidoDocumento): Blob {
     if (p.cnpj) linhas.push(`CNPJ: ${p.cnpj}`);
     if (p.inscricaoEstadual) linhas.push(`Inscrição estadual: ${p.inscricaoEstadual}`);
     if (p.endereco) linhas.push(`Endereço: ${p.endereco}`);
+    if (p.nomeContato) linhas.push(`Contato: ${p.nomeContato}`);
     if (p.telefone) linhas.push(`Telefone: ${p.telefone}`);
+    if (p.celular) linhas.push(`Celular: ${p.celular}`);
     if (p.email) linhas.push(`E-mail: ${p.email}`);
+    if (p.emailNotas) linhas.push(`E-mail p/ notas: ${p.emailNotas}`);
     return linhas;
   };
 
