@@ -16,10 +16,11 @@ export function AuthLayout() {
             mb={3}
             objectFit="contain"
           />
-          <Heading size="lg" mb={2}>
+          <Heading size="lg" mb={1}>
             KIPI
           </Heading>
-          <Text color="gray.500">Venda Mais: portal do representante comercial KIPI.</Text>
+          <Text fontWeight="semibold" color="gray.600" mb={2}>KIPI - Representante</Text>
+          <Text color="gray.500">VendeMais - portal do representante comercial KIPI.</Text>
         </Box>
         <Outlet />
       </Container>

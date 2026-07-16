@@ -98,7 +98,7 @@ export function MainLayout() {
                 color="gray.500"
                 display={{ base: 'block', md: 'block' }}
               >
-                {representanteNomeFantasia ?? 'Venda Mais'}
+                {representanteNomeFantasia ?? 'VendeMais'}
               </Text>
               {representanteCnpj && (
                 <Text fontSize="xs" color="gray.500">

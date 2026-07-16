@@ -5,7 +5,6 @@ import {
   FormErrorMessage,
   FormLabel,
   Input,
-  Link,
   Stack,
   Text,
   useToast,
@@ -117,15 +116,12 @@ export function LoginPage() {
             <Button type="submit" colorScheme="brand" isLoading={isSubmitting} w="full" mt={2}>
               Entrar
             </Button>
+
+            <Button as={RouterLink} to="/register" colorScheme="brand" w="full">
+              Criar minha conta
+            </Button>
           </Stack>
         </form>
-
-        <Text fontSize="sm" color="gray.600" textAlign="center">
-          Ainda não tem conta?{' '}
-          <Link as={RouterLink} to="/register" color="brand.500" fontWeight="medium">
-            Criar minha conta
-          </Link>
-        </Text>
       </Stack>
     </Box>
   );
