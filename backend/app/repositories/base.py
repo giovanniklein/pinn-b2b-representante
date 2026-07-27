@@ -624,15 +624,13 @@ class VarejistaLeituraRepository:
     ) -> List[Dict[str, Any]]:
         """Clientes disponíveis para o representante VENDER pelo VendeMais.
 
-        Inclui todos os clientes ATIVOS da plataforma + os PRÉ-CADASTROS criados
-        pelo próprio representante (para que ele possa vender e, na entrega,
-        ativar o cliente).
+        Regra: o representante só vende e enxerga os clientes que ELE MESMO
+        cadastrou (vinculados a ele por ``criado_por_representante_id``), sejam
+        eles já ATIVOS ou ainda PRÉ-CADASTROS. Clientes de outros representantes
+        ou sem vínculo não aparecem para ele.
         """
 
-        base = await self.listar_todos(q=q)
-        pre = await self.listar_pre_cadastros_do_representante(representante_id, q=q)
-        vistos = {str(d.get("_id")) for d in base}
-        return base + [d for d in pre if str(d.get("_id")) not in vistos]
+        return await self.listar_criados_por_representante(representante_id, q=q)
 
     async def listar_pre_cadastros_do_representante(
         self,

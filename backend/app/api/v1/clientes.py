@@ -60,17 +60,14 @@ async def obter_cliente(
     if not representante:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Representante inativo")
 
-    # Venda liberada para qualquer cliente ativo; além disso, o rep pode acessar
-    # seus próprios pré-cadastros (ainda não ativos).
+    # O rep só acessa clientes que ELE cadastrou (ativos ou pré-cadastros).
     repo = VarejistaLeituraRepository(db)
     cliente = await repo.get_by_id(cliente_id)
+    if cliente and cliente.get("criado_por_representante_id") != representante_id:
+        cliente = None
     if not cliente:
         raw = await repo.get_raw_by_id(cliente_id)
-        if (
-            raw
-            and raw.get("status_cadastro") == "pre_cadastro"
-            and raw.get("criado_por_representante_id") == representante_id
-        ):
+        if raw and raw.get("criado_por_representante_id") == representante_id:
             cliente = raw
     if not cliente:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cliente nao encontrado")

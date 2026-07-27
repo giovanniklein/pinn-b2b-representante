@@ -55,6 +55,8 @@ export interface PedidoDocumento {
   condicaoPagamento?: string | null;
   senhaCompra?: string | null;
   observacao?: string | null;
+  /** Dados de Ordem de Compra (OC), quando o cliente preencheu. */
+  oc?: Record<string, any> | null;
   itens: PedidoDocumentoItem[];
   valorTotal: number;
 }
@@ -233,6 +235,42 @@ export function gerarPedidoPdfBlob(dados: PedidoDocumento): Blob {
   if (dados.senhaCompra) condicoes.push(`Senha da compra: ${dados.senhaCompra}`);
   if (dados.observacao) condicoes.push(`Observação: ${dados.observacao}`);
   y = desenharBloco('CONDIÇÕES', condicoes, mX, y, contentW) + 2;
+
+  // ---------- Bloco Ordem de Compra (OC), se preenchido ----------
+  const oc = dados.oc;
+  if (oc && typeof oc === 'object') {
+    const end = (e: any): string => {
+      if (!e || typeof e !== 'object') return '';
+      const l1 = [e.rua, e.numero].filter(Boolean).join(', ');
+      const l2 = [e.bairro, [e.municipio, e.uf || e.estado].filter(Boolean).join('/')].filter(Boolean).join(' - ');
+      const partes = [l1, l2, e.cep ? `CEP ${e.cep}` : '', e.complemento ? `Compl.: ${e.complemento}` : '', e.ponto_referencia ? `Ref.: ${e.ponto_referencia}` : ''];
+      return partes.filter(Boolean).join(' | ');
+    };
+    const linhasOc: string[] = [];
+    if (dados.comprador?.razaoSocial || dados.comprador?.nome) {
+      linhasOc.push(`Faturado e por conta de: ${dados.comprador.razaoSocial || dados.comprador.nome}`);
+    }
+    if (oc.numero_oc) linhasOc.push(`Número da OC: ${oc.numero_oc}`);
+    const datas = [
+      oc.data_oc ? `Data da OC: ${oc.data_oc}` : '',
+      oc.data_previsao_entrega ? `Previsão de entrega: ${oc.data_previsao_entrega}` : '',
+    ].filter(Boolean).join('    ');
+    if (datas) linhasOc.push(datas);
+    if (oc.horarios_recebimento) linhasOc.push(`Horários de recebimento: ${oc.horarios_recebimento}`);
+    const entregaOc = end(oc.entrega);
+    if (entregaOc) linhasOc.push(`Endereço de entrega: ${entregaOc}`);
+    const cobrancaOc = end(oc.cobranca);
+    if (cobrancaOc) linhasOc.push(`Endereço de cobrança: ${cobrancaOc}`);
+    const receb = [
+      oc.recebedor_nome ? `Recebedor: ${oc.recebedor_nome}` : '',
+      oc.recebedor_fone ? `Fone: ${oc.recebedor_fone}` : '',
+      oc.recebedor_matricula ? `Matrícula: ${oc.recebedor_matricula}` : '',
+    ].filter(Boolean).join('    ');
+    if (receb) linhasOc.push(receb);
+    if (linhasOc.length) {
+      y = desenharBloco('ORDEM DE COMPRA (OC)', linhasOc, mX, y, contentW) + 2;
+    }
+  }
 
   // ---------- Itens ----------
   const body = dados.itens.map((item, index) => [

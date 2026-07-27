@@ -353,8 +353,13 @@ class CarrinhoService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Cliente nao encontrado",
             )
-        # O representante pode vender para qualquer cliente da plataforma
-        # (sem restrição por área de atendimento).
+        # O representante só vende para os clientes que ELE cadastrou (vinculados
+        # a ele). Não pode vender para clientes de outros reps ou sem vínculo.
+        if cliente.get("criado_por_representante_id") != representante_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Você só pode vender para clientes que você cadastrou.",
+            )
 
         cliente_enderecos = self._normalizar_enderecos_cliente(cliente)
         enderecos_por_id: Dict[str, Dict] = {e["id"]: e for e in cliente_enderecos}
@@ -459,6 +464,7 @@ class CarrinhoService:
 
             pedido_doc = {
                 "origem_venda": "venda_mais",
+                "plano_venda": "vendemais",
                 # Canal de origem: venda feita pelo representante no app VendeMais.
                 "canal_venda": "representante",
                 "atacadista_id": atacadista_id,
