@@ -37,6 +37,19 @@ async def _get_representante_ativo(db: AsyncIOMotorDatabase, representante_id: s
     return representante
 
 
+@router.get("/cnpj/{cnpj}")
+async def buscar_cnpj(cnpj: str, _: RepresentanteDep) -> dict:
+    """Consulta o CNPJ na API pública para auto-preencher o cadastro do cliente.
+
+    Usado pela tela "Novo cliente" do VendeMais: o representante digita o CNPJ
+    e os dados cadastrais (razão social, inscrição estadual, endereço, cidade,
+    UF, telefone) vêm preenchidos — evitando cliente sem cidade, que ficaria
+    sem catálogo por não casar com a cobertura de nenhum parceiro.
+    """
+
+    return await CNPJService().buscar_dados(cnpj)
+
+
 @router.post("", response_model=ClienteListItem, status_code=status.HTTP_201_CREATED)
 @router.post("/", response_model=ClienteListItem, status_code=status.HTTP_201_CREATED)
 async def criar_cliente(
@@ -101,6 +114,12 @@ async def criar_cliente(
         "telefone": payload.telefone or cnpj_data.get("telefone"),
         "razao_social": razao_social,
         "nome_fantasia": nome_fantasia,
+        # Cidade/UF também no topo do documento: é por aqui que o catálogo
+        # descobre quais parceiros atendem este cliente. Sem isso o cliente
+        # fica "sem cidade" e a cobertura por praça não funciona.
+        "cidade": principal["cidade"],
+        "uf": principal["uf"],
+        "inscricao_estadual": cnpj_data.get("inscricao_estadual"),
         "enderecos": [principal, *extras],
         "ativo": False,
         "status_cadastro": "pre_cadastro",

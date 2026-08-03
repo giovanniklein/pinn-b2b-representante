@@ -37,13 +37,19 @@ class ProdutoLeituraService:
             return None
 
         cliente = await self.varejista_repo.get_by_id(cliente_id)
+        if not cliente and representante_id:
+            # PRÉ-CADASTRO: o cliente criado pelo representante nasce inativo e
+            # só é ativado quando a 1ª venda VendeMais é entregue. Ele PRECISA
+            # aparecer aqui, senão o rep não consegue montar a venda que vai
+            # justamente ativá-lo.
+            raw = await self.varejista_repo.get_raw_by_id(cliente_id)
+            if raw and raw.get("criado_por_representante_id") == representante_id:
+                cliente = raw
         if not cliente:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cliente nao encontrado")
 
-        # O representante pode atender qualquer cliente da plataforma; apenas
-        # garantimos que o representante esteja ativo. A cobertura por cidade
-        # continua sendo aplicada do lado do PARCEIRO (só aparecem parceiros
-        # VendeMais que atendem a cidade do cliente).
+        # A cobertura por cidade continua sendo aplicada do lado do PARCEIRO (só
+        # aparecem parceiros VendeMais que atendem a cidade do cliente).
         if representante_id:
             representante = await self.representante_repo.get_active_by_id(representante_id)
             if not representante:

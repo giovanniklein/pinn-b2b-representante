@@ -71,6 +71,7 @@ export function ClientsPage() {
   const [form, setForm] = useState<FormState>(emptyForm);
   const [showSenha, setShowSenha] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [buscandoCnpj, setBuscandoCnpj] = useState(false);
 
   const toast = useToast();
   const { isOpen, onOpen, onClose } = useDisclosure();
@@ -118,7 +119,57 @@ export function ClientsPage() {
     onOpen();
   };
 
+  const buscarCnpj = async () => {
+    const digitos = (form.cnpj || '').replace(/\D/g, '');
+    if (digitos.length !== 14) {
+      toast({
+        title: 'CNPJ inválido',
+        description: 'Informe os 14 dígitos do CNPJ.',
+        status: 'warning',
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+    setBuscandoCnpj(true);
+    try {
+      const { data } = await api.get(`/gestao/clientes/cnpj/${digitos}`);
+      setForm((prev) => ({
+        ...prev,
+        razao_social: data.razao_social ?? prev.razao_social,
+        nome_fantasia: data.nome_fantasia ?? data.razao_social ?? prev.nome_fantasia,
+        cidade: data.cidade ?? prev.cidade,
+        uf: (data.uf ?? prev.uf ?? '').toUpperCase(),
+        telefone: data.telefone ?? prev.telefone,
+        email: prev.email || (data.email ?? ''),
+      }));
+      toast({ title: 'Dados carregados pelo CNPJ', status: 'success', duration: 3000 });
+    } catch (err: any) {
+      toast({
+        title: 'Não foi possível consultar o CNPJ',
+        description:
+          err?.response?.data?.detail ?? 'Preencha os dados manualmente (informe cidade e UF).',
+        status: 'warning',
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setBuscandoCnpj(false);
+    }
+  };
+
   const salvar = async () => {
+    if (!editing && !(form.cidade || '').trim()) {
+      toast({
+        title: 'Informe a cidade do cliente',
+        description:
+          'Sem cidade o cliente não enxerga nenhum atacado, porque o catálogo é filtrado pela praça de atendimento.',
+        status: 'warning',
+        duration: 6000,
+        isClosable: true,
+      });
+      return;
+    }
     setSaving(true);
     try {
       if (editing) {
@@ -227,11 +278,23 @@ export function ClientsPage() {
                 <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
                   <FormControl isRequired>
                     <FormLabel>CNPJ</FormLabel>
-                    <Input
-                      value={form.cnpj}
-                      onChange={(e) => setForm({ ...form, cnpj: e.target.value })}
-                      placeholder="00.000.000/0000-00"
-                    />
+                    <HStack>
+                      <Input
+                        value={form.cnpj}
+                        onChange={(e) => setForm({ ...form, cnpj: e.target.value })}
+                        placeholder="00.000.000/0000-00"
+                      />
+                      <Button
+                        onClick={() => void buscarCnpj()}
+                        isLoading={buscandoCnpj}
+                        flexShrink={0}
+                      >
+                        Buscar
+                      </Button>
+                    </HStack>
+                    <Text fontSize="xs" color="gray.500" mt={1}>
+                      Busca razão social, endereço, cidade e UF automaticamente.
+                    </Text>
                   </FormControl>
                   <FormControl isRequired>
                     <FormLabel>E-mail de acesso</FormLabel>
@@ -291,12 +354,15 @@ export function ClientsPage() {
 
               {!editing && (
                 <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4}>
-                  <FormControl>
+                  <FormControl isRequired>
                     <FormLabel>Cidade</FormLabel>
                     <Input
                       value={form.cidade}
                       onChange={(e) => setForm({ ...form, cidade: e.target.value })}
                     />
+                    <Text fontSize="xs" color="gray.500" mt={1}>
+                      Obrigatória: o catálogo mostra só os atacados que atendem esta cidade.
+                    </Text>
                   </FormControl>
                   <FormControl>
                     <FormLabel>UF</FormLabel>
