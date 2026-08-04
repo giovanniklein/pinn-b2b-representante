@@ -306,33 +306,37 @@ export function ProductsPage() {
         mb={4}
       >
         <Stack spacing={2}>
-          <Box as="form" onSubmit={handleSearchSubmit}>
-            <InputGroup size="md">
-              <InputLeftElement pointerEvents="none">
-                <SearchIcon color="gray.400" />
-              </InputLeftElement>
-              <Input
-                placeholder="Buscar por nome ou descricao do produto"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                bg="white"
-              />
-            </InputGroup>
-          </Box>
-
-          <Box as="form" onSubmit={handleClienteSearchSubmit}>
-            <InputGroup size="md">
-              <InputLeftElement pointerEvents="none">
-                <SearchIcon color="gray.400" />
-              </InputLeftElement>
-              <Input
-                placeholder="Buscar cliente por nome, CNPJ ou email"
-                value={clienteSearch}
-                onChange={(e) => setClienteSearch(e.target.value)}
-                bg="white"
-              />
-            </InputGroup>
-          </Box>
+          {/* Uma barra de busca por vez: antes de escolher o cliente, só a busca
+              de CLIENTE; com o cliente em atendimento, só a busca de PRODUTO. */}
+          {clienteId ? (
+            <Box as="form" onSubmit={handleSearchSubmit}>
+              <InputGroup size="md">
+                <InputLeftElement pointerEvents="none">
+                  <SearchIcon color="gray.400" />
+                </InputLeftElement>
+                <Input
+                  placeholder="Buscar por nome ou descricao do produto"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  bg="white"
+                />
+              </InputGroup>
+            </Box>
+          ) : (
+            <Box as="form" onSubmit={handleClienteSearchSubmit}>
+              <InputGroup size="md">
+                <InputLeftElement pointerEvents="none">
+                  <SearchIcon color="gray.400" />
+                </InputLeftElement>
+                <Input
+                  placeholder="Buscar cliente por nome, CNPJ ou email"
+                  value={clienteSearch}
+                  onChange={(e) => setClienteSearch(e.target.value)}
+                  bg="white"
+                />
+              </InputGroup>
+            </Box>
+          )}
 
           <Flex gap={2} direction={{ base: 'column', sm: 'row' }}>
             <Select
