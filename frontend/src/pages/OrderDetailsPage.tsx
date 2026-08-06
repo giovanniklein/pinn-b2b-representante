@@ -128,6 +128,8 @@ function StatusBadge({ status }: { status: PedidoStatus }) {
             ? 'Cancelado'
             : 'Entregue';
 
+  const temCombo = (pedido?.itens ?? []).some((i: any) => i?.combo_id);
+
   return (
     <Badge colorScheme={colorScheme} variant="subtle" fontSize="0.75rem">
       {label}
@@ -358,6 +360,7 @@ export function OrderDetailsPage() {
           >
             Compartilhar PDF
           </Button>
+          {!temCombo && (
           <Button
             size="sm"
             colorScheme="brand"
@@ -368,6 +371,7 @@ export function OrderDetailsPage() {
           >
             Duplicar
           </Button>
+          )}
         </Stack>
       </Flex>
 

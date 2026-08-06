@@ -585,6 +585,19 @@ class CarrinhoService:
                 detail="Pedido nao encontrado",
             )
 
+        # Pedido de combo NÃO pode ser duplicado: repetiria a bonificação e
+        # furaria o preço negociado (o combo tem regra e validade próprias).
+        if pedido.get("tipo_operacao") == "bonificacao" or any(
+            item.get("combo_id") for item in (pedido.get("itens") or [])
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "Este pedido faz parte de um combo e não pode ser duplicado. "
+                    "Para repetir, escolha o combo novamente."
+                ),
+            )
+
         carrinho_doc = await self.carrinho_repo.get_carrinho_by_representante(representante_id)
         if not carrinho_doc:
             carrinho_doc = {
